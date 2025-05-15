@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ürün Ekle</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet">
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#1E3D59',
+secondary: '#2196F3'
+},
+borderRadius: {
+'none': '0px',
+'sm': '4px',
+DEFAULT: '8px',
+'md': '12px',
+'lg': '16px',
+'xl': '20px',
+'2xl': '24px',
+'3xl': '32px',
+'full': '9999px',
+'button': '8px'
+}
+}
+}
+}
+</script>
+<style>
+:where([class^="ri-"])::before { content: "\f3c2"; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+-webkit-appearance: none;
+margin: 0;
+}
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-6xl mx-auto p-4 sm:p-6">
+<div class="mb-6 sm:mb-8">
+<h1 class="text-2xl sm:text-3xl font-semibold text-primary">Yeni Ürün Ekle</h1>
+<p class="text-gray-600 mt-2">Lütfen ürün bilgilerini eksiksiz doldurunuz</p>
+</div>
+<form id="productForm" class="space-y-6">
+<div class="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<div class="lg:col-span-4 space-y-6">
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Ürün Resimleri (En fazla 10 adet)</label>
+<div class="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center h-80" id="dropZone">
+<div class="space-y-2">
+<i class="ri-upload-cloud-2-line text-4xl text-gray-400"></i>
+<p class="text-sm text-gray-600">Resimleri sürükleyip bırakın veya</p>
+<button type="button" class="px-4 py-2 text-sm text-primary border border-primary rounded-button hover:bg-primary/5">Dosya Seçin</button>
+<p class="text-xs text-gray-500">PNG, JPG, JPEG veya WEBP (En fazla 10 resim, her biri max. 5MB)</p>
+</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Açıklama</label>
+<textarea rows="6" class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"></textarea>
+</div>
+</div>
+<div class="lg:col-span-8 space-y-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Ürün Kodu</label>
+<div class="relative">
+<input type="text" value="URN409125" class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded text-gray-500" readonly>
+<div class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">Otomatik oluşturulur</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Ürün Adı <span class="text-red-500">*</span></label>
+<input type="text" class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" required>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Birim Fiyat <span class="text-red-500">*</span></label>
+<div class="relative">
+<input type="number" class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" required>
+<div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₺</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Barkod</label>
+<div class="relative">
+<input type="text" class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none">
+<div class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center">
+<i class="ri-barcode-line text-gray-400"></i>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Marka</label>
+<div class="relative">
+<select class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none pr-10">
+<option value="">Marka seçiniz</option>
+<option value="1">Samsung</option>
+<option value="2">Apple</option>
+<option value="3">LG</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none">
+<i class="ri-arrow-down-s-line text-gray-400"></i>
+</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Ölçüm Birimi <span class="text-red-500">*</span></label>
+<div class="relative">
+<select class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none pr-10" required>
+<option value="">Birim seçiniz</option>
+<option value="adet">Adet</option>
+<option value="kg">Kilogram</option>
+<option value="lt">Litre</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none">
+<i class="ri-arrow-down-s-line text-gray-400"></i>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Koli Adedi</label>
+<input type="number" class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none">
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">RAF No</label>
+<input type="text" class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none">
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Kategori <span class="text-red-500">*</span></label>
+<div class="relative">
+<select class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none pr-10" required>
+<option value="">Kategori seçiniz</option>
+<option value="1">Elektronik</option>
+<option value="2">Giyim</option>
+<option value="3">Gıda</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none">
+<i class="ri-arrow-down-s-line text-gray-400"></i>
+</div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-medium text-gray-700">Alt Kategori</label>
+<div class="relative">
+<select class="w-full px-4 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none pr-10">
+<option value="">Alt kategori seçiniz</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none">
+<i class="ri-arrow-down-s-line text-gray-400"></i>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+<button type="button" class="w-full sm:w-auto px-6 py-2 text-sm text-gray-600 border border-gray-200 rounded-button hover:bg-gray-50">İptal</button>
+<button type="submit" class="w-full sm:w-auto px-6 py-2 text-sm text-white bg-primary rounded-button hover:bg-primary/90">Ürünü Kaydet</button>
+</div>
+</form>
+</div>
+<div id="toast" class="fixed bottom-4 right-4 mx-4 sm:mx-0 transform translate-y-full opacity-0 transition-all duration-300 bg-green-500 text-white px-6 py-3 rounded shadow-lg">
+Ürün başarıyla kaydedildi
+</div>
+<script>
+document.getElementById('productForm').addEventListener('submit', function(e) {
+e.preventDefault();
+const toast = document.getElementById('toast');
+toast.style.transform = 'translateY(0)';
+toast.style.opacity = '1';
+setTimeout(() => {
+toast.style.transform = 'translateY(full)';
+toast.style.opacity = '0';
+}, 3000);
+});
+const dropZone = document.getElementById('dropZone');
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+dropZone.addEventListener(eventName, preventDefaults, false);
+});
+function preventDefaults (e) {
+e.preventDefault();
+e.stopPropagation();
+}
+['dragenter', 'dragover'].forEach(eventName => {
+dropZone.addEventListener(eventName, highlight, false);
+});
+['dragleave', 'drop'].forEach(eventName => {
+dropZone.addEventListener(eventName, unhighlight, false);
+});
+function highlight(e) {
+dropZone.classList.add('border-primary');
+}
+function unhighlight(e) {
+dropZone.classList.remove('border-primary');
+}
+</script>
+</body>
+</html>

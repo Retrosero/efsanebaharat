@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Müşteri Listesi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css">
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#4F46E5',
+secondary: '#6B7280'
+},
+borderRadius: {
+'none': '0px',
+'sm': '4px',
+DEFAULT: '8px',
+'md': '12px',
+'lg': '16px',
+'xl': '20px',
+'2xl': '24px',
+'3xl': '32px',
+'full': '9999px',
+'button': '8px'
+}
+}
+}
+}
+</script>
+<style>
+:where([class^="ri-"])::before { content: "\f3c2"; }
+@media (max-width: 768px) {
+.responsive-table {
+display: block;
+width: 100%;
+overflow-x: auto;
+}
+}
+.toggle-switch {
+width: 3rem;
+height: 1.5rem;
+background-color: #e5e7eb;
+border-radius: 9999px;
+position: relative;
+cursor: pointer;
+transition: background-color 0.2s;
+}
+.toggle-switch.active {
+background-color: #4F46E5;
+}
+.toggle-switch::after {
+content: '';
+position: absolute;
+top: 2px;
+left: 2px;
+width: 1.25rem;
+height: 1.25rem;
+background-color: white;
+border-radius: 50%;
+transition: transform 0.2s;
+}
+.toggle-switch.active::after {
+transform: translateX(1.5rem);
+}
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+<div class="flex flex-wrap gap-4 items-center justify-between">
+<div class="relative flex-1 min-w-[300px]">
+<input type="text" id="searchInput" placeholder="Müşteri ara..." class="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20">
+<i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+</div>
+<div class="flex flex-wrap items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="text-sm text-gray-600">Aktif</span>
+<div class="toggle-switch" id="activeToggle"></div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-sm text-gray-600">Bakiye</span>
+<div class="toggle-switch" id="balanceToggle"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-lg shadow overflow-hidden">
+<div class="responsive-table">
+<table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-50">
+<tr>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Müşteri Adı Soyadı</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefon Numarası</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider balance-column cursor-pointer hover:text-primary" id="balanceHeader">
+  Bakiye
+  <i class="ri-arrow-up-line ml-1 sort-icon hidden"></i>
+  <i class="ri-arrow-down-line ml-1 sort-icon hidden"></i>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider region-column hidden">Bölge</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider email-column hidden">Email</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider tax-column hidden">Vergi No</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider tax-office-column hidden">Vergi Dairesi</th>
+<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+<button id="columnToggle" class="text-primary hover:text-primary-dark">
+<i class="ri-add-line text-xl"></i>
+</button>
+</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-gray-200" id="customerTableBody">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div id="columnMenu" class="hidden fixed top-0 right-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out translate-x-full">
+<div class="p-4">
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-lg font-medium">Sütunlar</h3>
+<button id="closeMenu" class="text-gray-500 hover:text-gray-700">
+<i class="ri-close-line text-xl"></i>
+</button>
+</div>
+<div class="space-y-3">
+<label class="flex items-center space-x-2">
+<input type="checkbox" class="form-checkbox" data-column="region">
+<span>Bölge</span>
+</label>
+<label class="flex items-center space-x-2">
+<input type="checkbox" class="form-checkbox" data-column="email">
+<span>Email</span>
+</label>
+<label class="flex items-center space-x-2">
+<input type="checkbox" class="form-checkbox" data-column="tax">
+<span>Vergi No</span>
+</label>
+<label class="flex items-center space-x-2">
+<input type="checkbox" class="form-checkbox" data-column="tax-office">
+<span>Vergi Dairesi</span>
+</label>
+</div>
+</div>
+</div>
+<script>
+const mockCustomers = [
+{
+name: 'Ahmet Yılmaz',
+phone: '+90 532 123 4567',
+balance: '₺15,750.00',
+region: 'İstanbul',
+email: 'ahmet.yilmaz@email.com',
+taxNo: '1234567890',
+taxOffice: 'Kadıköy VD'
+},
+{
+name: 'Ayşe Demir',
+phone: '+90 533 234 5678',
+balance: '₺8,420.00',
+region: 'Ankara',
+email: 'ayse.demir@email.com',
+taxNo: '2345678901',
+taxOffice: 'Çankaya VD'
+},
+{
+name: 'Mehmet Kaya',
+phone: '+90 535 345 6789',
+balance: '₺23,100.00',
+region: 'İzmir',
+email: 'mehmet.kaya@email.com',
+taxNo: '3456789012',
+taxOffice: 'Konak VD'
+}
+];
+function renderCustomers() {
+const tbody = document.getElementById('customerTableBody');
+tbody.innerHTML = mockCustomers.map(customer => `
+<tr>
+<td class="px-6 py-4 whitespace-nowrap">${customer.name}</td>
+<td class="px-6 py-4 whitespace-nowrap">${customer.phone}</td>
+<td class="px-6 py-4 whitespace-nowrap balance-column">${customer.balance}</td>
+<td class="px-6 py-4 whitespace-nowrap region-column hidden">${customer.region}</td>
+<td class="px-6 py-4 whitespace-nowrap email-column hidden">${customer.email}</td>
+<td class="px-6 py-4 whitespace-nowrap tax-column hidden">${customer.taxNo}</td>
+<td class="px-6 py-4 whitespace-nowrap tax-office-column hidden">${customer.taxOffice}</td>
+<td class="px-6 py-4 whitespace-nowrap text-right"></td>
+</tr>
+`).join('');
+}
+let sortDirection = 'none';
+const sortCustomers = (direction) => {
+  mockCustomers.sort((a, b) => {
+    const balanceA = parseFloat(a.balance.replace('₺', '').replace(',', ''));
+    const balanceB = parseFloat(b.balance.replace('₺', '').replace(',', ''));
+    return direction === 'asc' ? balanceA - balanceB : balanceB - balanceA;
+  });
+};
+document.addEventListener('DOMContentLoaded', () => {
+const balanceHeader = document.getElementById('balanceHeader');
+const sortIcons = balanceHeader.querySelectorAll('.sort-icon');
+balanceHeader.addEventListener('click', () => {
+  if (sortDirection === 'none' || sortDirection === 'desc') {
+    sortDirection = 'asc';
+    sortCustomers('asc');
+    sortIcons[0].classList.remove('hidden');
+    sortIcons[1].classList.add('hidden');
+  } else {
+    sortDirection = 'desc';
+    sortCustomers('desc');
+    sortIcons[0].classList.add('hidden');
+    sortIcons[1].classList.remove('hidden');
+  }
+  renderCustomers();
+});
+renderCustomers();
+const toggles = document.querySelectorAll('.toggle-switch');
+toggles.forEach(toggle => {
+toggle.addEventListener('click', function() {
+this.classList.toggle('active');
+});
+});
+const columnToggle = document.getElementById('columnToggle');
+const columnMenu = document.getElementById('columnMenu');
+const closeMenu = document.getElementById('closeMenu');
+columnToggle.addEventListener('click', () => {
+columnMenu.classList.remove('translate-x-full');
+columnMenu.classList.remove('hidden');
+});
+closeMenu.addEventListener('click', () => {
+columnMenu.classList.add('translate-x-full');
+setTimeout(() => {
+columnMenu.classList.add('hidden');
+}, 200);
+});
+const columnCheckboxes = document.querySelectorAll('input[type="checkbox"][data-column]');
+columnCheckboxes.forEach(checkbox => {
+checkbox.addEventListener('change', function() {
+const columnClass = `.${this.dataset.column}-column`;
+const columns = document.querySelectorAll(columnClass);
+columns.forEach(column => {
+column.classList.toggle('hidden');
+});
+});
+});
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', function() {
+const searchTerm = this.value.toLowerCase();
+const rows = document.querySelectorAll('#customerTableBody tr');
+rows.forEach(row => {
+const text = row.textContent.toLowerCase();
+row.style.display = text.includes(searchTerm) ? '' : 'none';
+});
+});
+});
+</script>
+</body>
+</html>

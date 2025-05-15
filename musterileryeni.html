@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Müşteri Listesi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FDCD22',
+                        secondary: '#10B981'
+                    },
+                    borderRadius: {
+                        'none': '0px',
+                        'sm': '4px',
+                        DEFAULT: '8px',
+                        'md': '12px',
+                        'lg': '16px',
+                        'xl': '20px',
+                        '2xl': '24px',
+                        '3xl': '32px',
+                        'full': '9999px',
+                        'button': '8px'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :where([class^="ri-"])::before { content: "\f3c2"; }
+        .search-input::-webkit-search-cancel-button { display: none; }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="flex flex-col gap-6">
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex-1 min-w-[280px]">
+                    <div class="relative">
+                        <input type="search" placeholder="Müşteri ara..." class="w-full h-10 pl-10 pr-4 text-sm bg-white border border-gray-200 rounded focus:outline-none focus:border-primary search-input">
+                        <div class="absolute left-3 top-0 h-full flex items-center justify-center w-4">
+                            <i class="ri-search-line text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-600">Sayfa başına:</span>
+                        <select class="h-10 px-3 text-sm bg-white border border-gray-200 rounded focus:outline-none focus:border-primary cursor-pointer">
+                            <option>10</option>
+                            <option>20</option>
+                            <option>50</option>
+                        </select>
+                    </div>
+                    <button class="h-10 px-4 bg-secondary text-white rounded-button flex items-center gap-2 hover:bg-opacity-90 transition-colors cursor-pointer whitespace-nowrap">
+                        <i class="ri-add-line"></i>
+                        <span>Yeni Müşteri</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200">
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Müşteri Kodu</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Müşteri</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tip</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Telefon</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bakiye</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200" id="customerList">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="text-sm text-gray-600">
+                    7 kayıttan 1 - 7 arasındaki kayıtlar gösteriliyor
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="h-8 px-3 text-sm text-gray-600 border border-gray-200 rounded-button hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap" disabled>Önceki</button>
+                    <div class="h-8 min-w-[32px] px-3 flex items-center justify-center text-sm bg-primary text-white rounded-button">1</div>
+                    <button class="h-8 px-3 text-sm text-gray-600 border border-gray-200 rounded-button hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">Sonraki</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mockData = [
+            { code: '52323', name: 'Kubilay Çıtak', type: 'Müşteri', phone: '1111', balance: 0 },
+            { code: 'AYH', name: 'Ayhan Ermeç', type: 'Müşteri', phone: '999999999999999999999', balance: 0 },
+            { code: 'DENEME', name: 'Büşra Kalay', type: 'Müşteri', phone: '-', balance: -99.90 },
+            { code: 'DENEME2', name: 'Akın Türkekul', type: 'Müşteri', phone: '-', balance: -32399.99 },
+            { code: 'MUS352498', name: 'Puti Puti Kedi', type: 'Müşteri', phone: '222222222222222', balance: 0 },
+            { code: 'MUS352498', name: 'Puti Puti Kedi', type: 'Müşteri', phone: '222222222222222', balance: 0 },
+            { code: 'MUS8728559', name: 'Evren Puti', type: 'Üretici', phone: '12123321', balance: 0 }
+        ];
+
+        const customerList = document.getElementById('customerList');
+        
+        mockData.forEach(customer => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50 cursor-pointer transition-colors';
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">${customer.code}</td>
+                <td class="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">${customer.name}</td>
+                <td class="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">${customer.type}</td>
+                <td class="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">${customer.phone}</td>
+                <td class="px-6 py-4 text-sm whitespace-nowrap text-right ${customer.balance < 0 ? 'text-red-500' : 'text-gray-900'}">${customer.balance.toFixed(2)} ₺${customer.balance < 0 ? ' (Borç)' : ''}</td>
+            `;
+            
+            customerList.appendChild(row);
+        });
+    </script>
+</body>
+</html>

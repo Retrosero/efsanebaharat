@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayarlar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3176FF',
+                        secondary: '#6B7280'
+                    },
+                    borderRadius: {
+                        'none': '0px',
+                        'sm': '4px',
+                        DEFAULT: '8px',
+                        'md': '12px',
+                        'lg': '16px',
+                        'xl': '20px',
+                        '2xl': '24px',
+                        '3xl': '32px',
+                        'full': '9999px',
+                        'button': '8px'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :where([class^="ri-"])::before { content: "\f3c2"; }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="border-b">
+                <nav class="flex space-x-8" role="tablist">
+                    <button class="tab-btn active px-4 py-4 text-primary border-b-2 border-primary font-medium" data-tab="user">
+                        <i class="ri-user-line mr-2"></i>Kullanıcı
+                    </button>
+                    <button class="tab-btn px-4 py-4 text-gray-500 hover:text-gray-700 font-medium" data-tab="sales">
+                        <i class="ri-shopping-cart-line mr-2"></i>Satış
+                    </button>
+                    <button class="tab-btn px-4 py-4 text-gray-500 hover:text-gray-700 font-medium" data-tab="customer">
+                        <i class="ri-team-line mr-2"></i>Müşteri
+                    </button>
+                    <button class="tab-btn px-4 py-4 text-gray-500 hover:text-gray-700 font-medium" data-tab="brand">
+                        <i class="ri-store-line mr-2"></i>Marka
+                    </button>
+                    <button class="tab-btn px-4 py-4 text-gray-500 hover:text-gray-700 font-medium" data-tab="category">
+                        <i class="ri-folder-line mr-2"></i>Kategori
+                    </button>
+                    <button class="tab-btn px-4 py-4 text-gray-500 hover:text-gray-700 font-medium" data-tab="bank">
+                        <i class="ri-bank-line mr-2"></i>Banka
+                    </button>
+                    <button class="tab-btn px-4 py-4 text-gray-500 hover:text-gray-700 font-medium" data-tab="layout">
+                        <i class="ri-layout-line mr-2"></i>Sayfa Düzeni
+                    </button>
+                </nav>
+            </div>
+            <div class="mt-6">
+                <!-- Kullanıcı Sekmesi -->
+                <div id="user" class="tab-content active">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 gap-6">
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Profil Bilgileri</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Ad Soyad</label>
+                                        <input type="text" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="Mehmet Yılmaz">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">E-posta</label>
+                                        <input type="email" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="mehmet@example.com">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Telefon</label>
+                                        <input type="tel" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="+90 555 123 4567">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Şifre Değiştirme</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Mevcut Şifre</label>
+                                        <input type="password" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Yeni Şifre</label>
+                                        <input type="password" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Yeni Şifre Tekrar</label>
+                                        <input type="password" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Bildirim Tercihleri</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-gray-700">E-posta Bildirimleri</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-gray-700">SMS Bildirimleri</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button class="px-4 py-2 border border-gray-300 rounded-button text-gray-700 hover:bg-gray-50">İptal</button>
+                            <button class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Satış Sekmesi -->
+                <div id="sales" class="tab-content">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 gap-6">
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Fiyatlandırma Ayarları</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Para Birimi</label>
+                                        <select class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                            <option>TRY - Türk Lirası</option>
+                                            <option>USD - Amerikan Doları</option>
+                                            <option>EUR - Euro</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Varsayılan KDV Oranı (%)</label>
+                                        <input type="number" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="18">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Ödeme Yöntemleri</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <i class="ri-bank-card-line text-xl mr-2"></i>
+                                            <span class="text-sm font-medium text-gray-700">Kredi Kartı</span>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <i class="ri-money-dollar-circle-line text-xl mr-2"></i>
+                                            <span class="text-sm font-medium text-gray-700">Havale/EFT</span>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button class="px-4 py-2 border border-gray-300 rounded-button text-gray-700 hover:bg-gray-50">İptal</button>
+                            <button class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Müşteri Sekmesi -->
+                <div id="customer" class="tab-content">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 gap-6">
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Müşteri Grupları</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <span class="text-sm font-medium">Standart Müşteriler</span>
+                                        <div class="flex items-center space-x-2">
+                                            <button class="text-gray-500 hover:text-primary">
+                                                <i class="ri-pencil-line"></i>
+                                            </button>
+                                            <button class="text-gray-500 hover:text-red-500">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <span class="text-sm font-medium">VIP Müşteriler</span>
+                                        <div class="flex items-center space-x-2">
+                                            <button class="text-gray-500 hover:text-primary">
+                                                <i class="ri-pencil-line"></i>
+                                            </button>
+                                            <button class="text-gray-500 hover:text-red-500">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="mt-4 flex items-center text-primary">
+                                    <i class="ri-add-line mr-1"></i>
+                                    Yeni Grup Ekle
+                                </button>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Sadakat Programı</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-gray-700">Puan Sistemi</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Puan/TL Oranı</label>
+                                        <input type="number" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button class="px-4 py-2 border border-gray-300 rounded-button text-gray-700 hover:bg-gray-50">İptal</button>
+                            <button class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Marka Sekmesi -->
+                <div id="brand" class="tab-content">
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium">Markalar</h3>
+                            <button class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">
+                                <i class="ri-add-line mr-1"></i>
+                                Yeni Marka
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div class="bg-white p-4 rounded-lg border flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <img src="https://public.readdy.ai/ai/img_res/b793410022c4aa3b05aa88359fc2eeef.jpg" class="w-12 h-12 rounded object-cover" alt="Marka Logo">
+                                    <span class="ml-3 font-medium">Nike</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button class="p-2 text-gray-500 hover:text-primary">
+                                        <i class="ri-pencil-line"></i>
+                                    </button>
+                                    <button class="p-2 text-gray-500 hover:text-red-500">
+                                        <i class="ri-delete-bin-line"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg border flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <img src="https://public.readdy.ai/ai/img_res/cc0997c4d84ac93090bd01da08c37d9a.jpg" class="w-12 h-12 rounded object-cover" alt="Marka Logo">
+                                    <span class="ml-3 font-medium">Adidas</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button class="p-2 text-gray-500 hover:text-primary">
+                                        <i class="ri-pencil-line"></i>
+                                    </button>
+                                    <button class="p-2 text-gray-500 hover:text-red-500">
+                                        <i class="ri-delete-bin-line"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kategori Sekmesi -->
+                <div id="category" class="tab-content">
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium">Kategoriler</h3>
+                            <button class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">
+                                <i class="ri-add-line mr-1"></i>
+                                Yeni Kategori
+                            </button>
+                        </div>
+                        <div class="bg-white rounded-lg border">
+                            <div class="p-4 border-b">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <i class="ri-folder-line text-xl mr-2"></i>
+                                        <span class="font-medium">Elektronik</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button class="p-2 text-gray-500 hover:text-primary">
+                                            <i class="ri-add-line"></i>
+                                        </button>
+                                        <button class="p-2 text-gray-500 hover:text-primary">
+                                            <i class="ri-pencil-line"></i>
+                                        </button>
+                                        <button class="p-2 text-gray-500 hover:text-red-500">
+                                            <i class="ri-delete-bin-line"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="ml-8 mt-2">
+                                    <div class="flex items-center justify-between py-2">
+                                        <span>Telefonlar</span>
+                                        <div class="flex items-center space-x-2">
+                                            <button class="p-2 text-gray-500 hover:text-primary">
+                                                <i class="ri-pencil-line"></i>
+                                            </button>
+                                            <button class="p-2 text-gray-500 hover:text-red-500">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between py-2">
+                                        <span>Bilgisayarlar</span>
+                                        <div class="flex items-center space-x-2">
+                                            <button class="p-2 text-gray-500 hover:text-primary">
+                                                <i class="ri-pencil-line"></i>
+                                            </button>
+                                            <button class="p-2 text-gray-500 hover:text-red-500">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Banka Sekmesi -->
+                <div id="bank" class="tab-content">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 gap-6">
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Banka Hesapları</h3>
+                                <div class="space-y-4">
+                                    <div class="p-4 border rounded-lg">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <i class="ri-bank-line text-xl mr-2"></i>
+                                                <div>
+                                                    <p class="font-medium">Ziraat Bankası</p>
+                                                    <p class="text-sm text-gray-500">TR12 3456 7890 1234 5678 90</p>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <button class="p-2 text-gray-500 hover:text-primary">
+                                                    <i class="ri-pencil-line"></i>
+                                                </button>
+                                                <button class="p-2 text-gray-500 hover:text-red-500">
+                                                    <i class="ri-delete-bin-line"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="mt-4 flex items-center text-primary">
+                                    <i class="ri-add-line mr-1"></i>
+                                    Yeni Hesap Ekle
+                                </button>
+                            </div>
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Ödeme Entegrasyonları</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <i class="ri-paypal-line text-xl mr-2"></i>
+                                            <span class="text-sm font-medium">PayPal</span>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <i class="ri-stripe-line text-xl mr-2"></i>
+                                            <span class="text-sm font-medium">Stripe</span>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sayfa Düzeni Sekmesi -->
+                <div id="layout" class="tab-content">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 gap-6">
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Tema Ayarları</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Ana Renk</label>
+                                        <div class="mt-1 flex items-center space-x-2">
+                                            <input type="color" class="w-8 h-8 rounded cursor-pointer" value="#3176FF">
+                                            <input type="text" class="block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="#3176FF">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Font Seçimi</label>
+                                        <select class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                            <option>Inter</option>
+                                            <option>Roboto</option>
+                                            <option>Open Sans</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-lg border">
+                                <h3 class="text-lg font-medium mb-4">Header Ayarları</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-gray-700">Logo Göster</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                 
+
+                                        <span class="text-sm font-medium text-gray-700">Menü Göster</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button class="px-4 py-2 border border-gray-300 rounded-button text-gray-700 hover:bg-gray-50">İptal</button>
+                            <button class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.dataset.tab;
+                
+                tabButtons.forEach(btn => btn.classList.remove('active', 'text-primary', 'border-primary'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                button.classList.add('active', 'text-primary', 'border-primary');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

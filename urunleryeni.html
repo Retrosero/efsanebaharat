@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ürün Yönetimi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css">
+<script>tailwind.config={theme:{extend:{colors:{primary:'#3176FF',secondary:'#4B5563'},borderRadius:{'none':'0px','sm':'4px',DEFAULT:'8px','md':'12px','lg':'16px','xl':'20px','2xl':'24px','3xl':'32px','full':'9999px','button':'8px'}}}}</script>
+<style>
+:where([class^="ri-"])::before { content: "\f3c2"; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+-webkit-appearance: none;
+margin: 0;
+}
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-[1440px] mx-auto p-6">
+<div class="bg-white rounded-lg shadow-sm p-6">
+<div class="flex items-center justify-between mb-6">
+<div class="relative flex-1 max-w-md">
+<input type="text" placeholder="Ürün ara..." class="w-full pl-10 pr-4 py-2 text-sm text-gray-700 border border-gray-200 rounded focus:outline-none focus:border-primary">
+<i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-2">
+<span class="text-sm text-gray-500">Görünüm:</span>
+<div class="flex border border-gray-200 rounded-lg p-1">
+<button class="p-1.5 rounded hover:bg-gray-100">
+<i class="ri-grid-fill text-gray-700"></i>
+</button>
+<button class="p-1.5 rounded bg-gray-100">
+<i class="ri-list-unordered text-gray-700"></i>
+</button>
+<button class="p-1.5 rounded hover:bg-gray-100">
+<i class="ri-table-line text-gray-700"></i>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-sm text-gray-500">Göster:</span>
+<select class="pr-8 py-1.5 text-sm text-gray-700 border border-gray-200 rounded focus:outline-none focus:border-primary">
+<option>20</option>
+<option>50</option>
+<option>100</option>
+</select>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-button hover:bg-gray-50">
+<i class="ri-filter-3-line"></i>
+Filtrele
+</button>
+<button class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-button hover:bg-gray-50">
+<i class="ri-sort-desc"></i>
+Sırala
+</button>
+<button class="flex items-center gap-2 px-4 py-2 text-sm text-gray-800 bg-primary rounded-button hover:bg-primary/90">
+<i class="ri-add-line"></i>
+Ürün Ekle
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full">
+<thead>
+<tr class="border-b border-gray-200">
+<th class="py-4 px-4 text-left text-sm font-medium text-gray-500">Ürün</th>
+<th class="py-4 px-4 text-left text-sm font-medium text-gray-500">Ürün Kodu</th>
+<th class="py-4 px-4 text-left text-sm font-medium text-gray-500">Barkod</th>
+<th class="py-4 px-4 text-left text-sm font-medium text-gray-500">Raf No</th>
+<th class="py-4 px-4 text-left text-sm font-medium text-gray-500">Ambalaj</th>
+<th class="py-4 px-4 text-left text-sm font-medium text-gray-500">Stok</th>
+<th class="py-4 px-4 text-left text-sm font-medium text-gray-500">Koli Adeti</th>
+<th class="py-4 px-4 text-right text-sm font-medium text-gray-500">Birim Fiyat</th>
+</tr>
+</thead>
+<tbody id="productTableBody">
+</tbody>
+</table>
+</div>
+<div class="flex items-center justify-between mt-6">
+<div class="text-sm text-gray-500">
+Toplam 50 ürün
+</div>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50" disabled>
+<i class="ri-arrow-left-s-line"></i>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded bg-primary text-gray-800">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-700 hover:bg-gray-50">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-700 hover:bg-gray-50">3</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-50">
+<i class="ri-arrow-right-s-line"></i>
+</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+const mockProducts = [
+{
+name: "Samsung Galaxy S24 Ultra",
+code: "1905",
+barcode: "4810344072436",
+shelf: "GS-1",
+packaging: "11",
+stock: 1,
+packageQuantity: 24,
+price: 99.90,
+image: "https://public.readdy.ai/ai/img_res/45723c9ff2e0c56e7b27713c22125e27.jpg"
+},
+{
+name: "iPhone 15 Pro Max",
+code: "0",
+barcode: "890000000002",
+shelf: "RAF-C3",
+packaging: "Poşet",
+stock: 29,
+packageQuantity: 8,
+price: 35999.99,
+image: "https://public.readdy.ai/ai/img_res/6d70ced9661891d1085c43433b260ce9.jpg"
+}
+];
+const productTableBody = document.getElementById('productTableBody');
+mockProducts.forEach(product => {
+const row = document.createElement('tr');
+row.className = 'border-b border-gray-200 hover:bg-gray-50';
+row.innerHTML = `
+<td class="py-4 px-4">
+<div class="flex items-center gap-3">
+<img src="${product.image}" alt="${product.name}" class="w-10 h-10 rounded object-cover">
+<span class="text-sm text-gray-700">${product.name}</span>
+</div>
+</td>
+<td class="py-4 px-4 text-sm text-gray-700">${product.code}</td>
+<td class="py-4 px-4 text-sm text-gray-700">${product.barcode}</td>
+<td class="py-4 px-4 text-sm text-gray-700">${product.shelf}</td>
+<td class="py-4 px-4 text-sm text-gray-700">${product.packaging}</td>
+<td class="py-4 px-4 text-sm text-gray-700">${product.stock}</td>
+<td class="py-4 px-4 text-sm text-gray-700">${product.packageQuantity}</td>
+<td class="py-4 px-4 text-sm text-gray-700 text-right">${product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
+`;
+productTableBody.appendChild(row);
+});
+</script>
+</body>
+</html>
