@@ -1,8 +1,10 @@
 <?php
-session_start();
+// Gerekli dosyaları dahil et
+require_once 'includes/db.php';
+require_once 'includes/auth.php';
 
-// Tüm oturum verilerini sil
-session_destroy();
+// Kullanıcı çıkış fonksiyonunu çağır
+kullaniciCikis();
 
 // Giriş sayfasına yönlendir
 header('Location: giris.php');

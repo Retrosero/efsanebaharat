@@ -91,45 +91,76 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
 body {
   background-color: white;
 }
+
+/* Arama sonucu vurgulama stili */
+mark {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 0.1em 0.2em;
+  border-radius: 2px;
+  font-weight: 500;
+}
 </style>
 
 <!-- Yeni Tasarım -->
 <div class="p-0">
   <div class="max-w-full mx-auto">
-    <div class="bg-white shadow-sm p-6">
-      <div class="flex items-center justify-between mb-6">
-        <!-- Arama Kutusu -->
-        <div class="relative flex-1 max-w-md">
+    <div class="bg-white shadow-sm p-4 md:p-6">
+      <!-- Arama ve Kontroller -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        <!-- Arama Kutusu (Hem Mobil Hem Desktop için) -->
+        <div class="relative flex-1 max-w-full md:max-w-md">
           <input 
             type="text" 
             id="searchInput"
-            placeholder="Ürün ara..." 
-            class="w-full pl-10 pr-4 py-2 text-sm text-gray-700 border border-gray-200 rounded focus:outline-none focus:border-primary"
+            placeholder="Ürün ara... (Türkçe karakter destekli)" 
+            class="w-full pl-10 pr-4 py-2.5 text-sm text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:border-primary"
           >
           <i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
         </div>
+
+        <!-- Mobil için Filtre ve Sıralama -->
+        <div class="flex gap-2 md:hidden">
+          <button 
+            id="filterBtnMobile"
+            class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            <i class="ri-filter-3-line"></i>
+            Filtrele
+          </button>
+          <button 
+            id="sortBtnMobile"
+            class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            <i class="ri-sort-desc"></i>
+            Sırala
+          </button>
+        </div>
         
-        <!-- Sağ Taraf Butonlar -->
-        <div class="flex items-center gap-3">
+        <!-- Desktop için Kontroller -->
+        <div class="hidden md:flex items-center gap-3 flex-wrap">
           <!-- Görünüm Seçenekleri -->
           <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-500">Görünüm:</span>
+            <span class="text-sm text-gray-500 whitespace-nowrap">Görünüm:</span>
             <div class="flex border border-gray-200 rounded-lg p-1">
               <button 
                 class="view-btn p-1.5 rounded hover:bg-gray-100" 
                 data-view="grid"
+                title="Grid Görünüm"
               >
                 <i class="ri-grid-fill text-gray-700"></i>
               </button>
               <button 
                 class="view-btn p-1.5 rounded hover:bg-gray-100" 
                 data-view="list"
+                title="Liste Görünüm"
               >
                 <i class="ri-list-unordered text-gray-700"></i>
               </button>
               <button 
                 class="view-btn p-1.5 rounded hover:bg-gray-100" 
                 data-view="table"
+                title="Tablo Görünüm"
               >
                 <i class="ri-table-line text-gray-700"></i>
               </button>
@@ -138,8 +169,8 @@ body {
           
           <!-- Göster Seçeneği -->
           <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-500">Göster:</span>
-            <select id="showCount" class="pr-8 py-1.5 text-sm text-gray-700 border border-gray-200 rounded focus:outline-none focus:border-primary">
+            <span class="text-sm text-gray-500 whitespace-nowrap">Göster:</span>
+            <select id="showCount" class="pr-8 py-1.5 text-sm text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:border-primary">
               <option value="20">20</option>
               <option value="50" selected>50</option>
               <option value="100">100</option>
@@ -149,7 +180,7 @@ body {
           <!-- Filtre Butonu -->
           <button 
             id="filterBtn"
-            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-button hover:bg-gray-50"
+            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             <i class="ri-filter-3-line"></i>
             Filtrele
@@ -158,7 +189,7 @@ body {
           <!-- Sıralama Butonu -->
           <button 
             id="sortBtn"
-            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-button hover:bg-gray-50"
+            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             <i class="ri-sort-desc"></i>
             Sırala
@@ -167,7 +198,18 @@ body {
           <!-- Ürün Ekle Butonu -->
           <a 
             href="urun_ekle.php"
-            class="flex items-center gap-2 px-4 py-2 text-sm text-white bg-primary rounded-button hover:bg-primary/90"
+            class="flex items-center gap-2 px-4 py-2 text-sm text-white bg-primary rounded-lg hover:bg-primary/90"
+          >
+            <i class="ri-add-line"></i>
+            <span class="whitespace-nowrap">Ürün Ekle</span>
+          </a>
+        </div>
+
+        <!-- Mobil için Ürün Ekle Butonu -->
+        <div class="flex md:hidden">
+          <a 
+            href="urun_ekle.php"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-white bg-primary rounded-lg hover:bg-primary/90"
           >
             <i class="ri-add-line"></i>
             Ürün Ekle
@@ -421,10 +463,145 @@ body {
   </div>
 </div>
 
+<script src="assets/js/search.js"></script>
 <script>
 // Ürün detay sayfasına yönlendirme
 function showProductDetail(id) {
   window.location.href = 'urun_detay.php?id=' + id;
+}
+
+// Türkçe karakter dönüşüm fonksiyonu
+function convertTurkishToBasic(text) {
+  const turkishChars = {
+    'ı': 'i', 'İ': 'i',
+    'ğ': 'g', 'Ğ': 'g',
+    'ü': 'u', 'Ü': 'u',
+    'ş': 's', 'Ş': 's',
+    'ö': 'o', 'Ö': 'o',
+    'ç': 'c', 'Ç': 'c',
+    'â': 'a', 'Â': 'a',
+    'î': 'i', 'Î': 'i',
+    'û': 'u', 'Û': 'u'
+  };
+  
+  return text.replace(/[ıİğĞüÜşŞöÖçÇâÂîÎûÛ]/g, letter => turkishChars[letter] || letter);
+}
+
+// Arama işlevselliği
+const searchInput = document.getElementById('searchInput');
+
+searchInput.addEventListener('input', function(e) {
+  const searchTerm = e.target.value.toLowerCase().trim();
+  const allProducts = document.querySelectorAll('.product-item');
+  let visibleCount = 0;
+
+  // Arama terimini boşluklara göre ayır ve Türkçe karakterleri dönüştür
+  const searchTerms = searchTerm.split(' ')
+    .filter(term => term.length > 0)
+    .map(term => convertTurkishToBasic(term.toLowerCase()));
+
+  allProducts.forEach(product => {
+    try {
+      // Grid görünümü için
+      const productName = convertTurkishToBasic(product.querySelector('h3')?.textContent.toLowerCase() || '');
+      
+      // Liste ve tablo görünümü için ek alanlar
+      const productCode = convertTurkishToBasic(product.querySelector('[class*="col-urun_kodu"]')?.textContent.toLowerCase() || 
+                         product.querySelector('td:nth-child(2)')?.textContent.toLowerCase() || '');
+      const productBarcode = convertTurkishToBasic(product.querySelector('[class*="col-barkod"]')?.textContent.toLowerCase() || 
+                            product.querySelector('td:nth-child(3)')?.textContent.toLowerCase() || '');
+
+      // Tüm arama terimleri için kontrol
+      const isVisible = searchTerms.every(term => {
+        return productName.includes(term) || 
+               productCode.includes(term) || 
+               productBarcode.includes(term);
+      });
+
+      if (isVisible) {
+        product.style.display = '';
+        visibleCount++;
+        
+        // Eşleşen metni vurgula
+        highlightMatch(product, searchTerms);
+      } else {
+        product.style.display = 'none';
+        
+        // Vurgulamaları kaldır
+        removeHighlights(product);
+      }
+    } catch (error) {
+      console.error('Ürün arama hatası:', error);
+    }
+  });
+
+  updateTotalCount(visibleCount);
+});
+
+// Eşleşen metni vurgulama fonksiyonu
+function highlightMatch(product, searchTerms) {
+  if (!product || searchTerms.length === 0) return;
+
+  try {
+    const elements = [
+      product.querySelector('h3'),
+      product.querySelector('[class*="col-urun_kodu"]'),
+      product.querySelector('[class*="col-barkod"]'),
+      ...Array.from(product.querySelectorAll('td'))
+    ].filter(el => el); // null elemanları filtrele
+
+    elements.forEach(element => {
+      if (!element) return;
+      
+      let html = element.textContent;
+      
+      // Önce eski vurgulamaları kaldır
+      html = html.replace(/<\/?mark>/g, '');
+      
+      // Yeni vurgulamaları ekle
+      searchTerms.forEach(term => {
+        if (term.length > 0) {
+          const regex = new RegExp(`(${term})`, 'gi');
+          html = html.replace(regex, '<mark>$1</mark>');
+        }
+      });
+      
+      element.innerHTML = html;
+    });
+  } catch (error) {
+    console.error('Vurgulama hatası:', error);
+  }
+}
+
+// Vurgulamaları kaldırma fonksiyonu
+function removeHighlights(product) {
+  if (!product) return;
+
+  try {
+    const elements = [
+      product.querySelector('h3'),
+      product.querySelector('[class*="col-urun_kodu"]'),
+      product.querySelector('[class*="col-barkod"]'),
+      ...Array.from(product.querySelectorAll('td'))
+    ].filter(el => el);
+
+    elements.forEach(element => {
+      if (element) {
+        element.innerHTML = element.innerHTML.replace(/<\/?mark>/g, '');
+      }
+    });
+  } catch (error) {
+    console.error('Vurgulama kaldırma hatası:', error);
+  }
+}
+
+// Toplam ürün sayısını güncelle
+function updateTotalCount(count) {
+  const countElement = document.querySelector('.text-gray-500');
+  if (countElement) {
+    const countText = count !== undefined ? count : document.querySelectorAll('.product-item:not([style*="display: none"])').length;
+    countElement.textContent = `Toplam ${countText} ürün listeleniyor`;
+  }
 }
 
 // Görünüm değiştirme
@@ -443,19 +620,19 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Görünümü değiştir
       const view = this.dataset.view;
-      productsGrid.classList.add('hidden');
-      productsList.classList.add('hidden');
-      productsTable.classList.add('hidden');
+      if (productsGrid) productsGrid.classList.add('hidden');
+      if (productsList) productsList.classList.add('hidden');
+      if (productsTable) productsTable.classList.add('hidden');
       
       switch(view) {
         case 'grid':
-          productsGrid.classList.remove('hidden');
+          if (productsGrid) productsGrid.classList.remove('hidden');
           break;
         case 'list':
-          productsList.classList.remove('hidden');
+          if (productsList) productsList.classList.remove('hidden');
           break;
         case 'table':
-          productsTable.classList.remove('hidden');
+          if (productsTable) productsTable.classList.remove('hidden');
           break;
       }
       
@@ -470,45 +647,58 @@ document.addEventListener('DOMContentLoaded', function() {
     const btn = document.querySelector(`[data-view="${lastView}"]`);
     if (btn) {
       btn.click();
-    } else {
-      // Varsayılan olarak grid görünümünü göster
+    } else if (document.querySelector('[data-view="grid"]')) {
       document.querySelector('[data-view="grid"]').click();
     }
-  } else {
-    // Varsayılan olarak grid görünümünü göster
+  } else if (document.querySelector('[data-view="grid"]')) {
     document.querySelector('[data-view="grid"]').click();
   }
   
-  // Filtre Modal
+  // Modal işlemleri için gerekli elementler
   const filterBtn = document.getElementById('filterBtn');
+  const filterBtnMobile = document.getElementById('filterBtnMobile');
   const filterModal = document.getElementById('filterModal');
-  const closeFilterModal = document.querySelector('.close-filter-modal');
+  const closeFilterModalBtn = document.querySelector('.close-filter-modal');
   
-  filterBtn.addEventListener('click', () => {
-    filterModal.classList.remove('hidden');
-    filterModal.classList.add('flex');
-  });
-  
-  closeFilterModal.addEventListener('click', () => {
-    filterModal.classList.add('hidden');
-    filterModal.classList.remove('flex');
-  });
-  
-  // Sıralama Modal
   const sortBtn = document.getElementById('sortBtn');
+  const sortBtnMobile = document.getElementById('sortBtnMobile');
   const sortModal = document.getElementById('sortModal');
-  const closeSortModal = document.querySelector('.close-sort-modal');
-  
-  sortBtn.addEventListener('click', () => {
-    sortModal.classList.remove('hidden');
-    sortModal.classList.add('flex');
-  });
-  
-  closeSortModal.addEventListener('click', () => {
-    sortModal.classList.add('hidden');
-    sortModal.classList.remove('flex');
-  });
-  
+  const closeSortModalBtn = document.querySelector('.close-sort-modal');
+
+  // Modal işlevleri
+  function handleFilterModal(action) {
+    if (filterModal) {
+      if (action === 'open') {
+        filterModal.classList.remove('hidden');
+        filterModal.classList.add('flex');
+      } else {
+        filterModal.classList.add('hidden');
+        filterModal.classList.remove('flex');
+      }
+    }
+  }
+
+  function handleSortModal(action) {
+    if (sortModal) {
+      if (action === 'open') {
+        sortModal.classList.remove('hidden');
+        sortModal.classList.add('flex');
+      } else {
+        sortModal.classList.add('hidden');
+        sortModal.classList.remove('flex');
+      }
+    }
+  }
+
+  // Modal event listeners
+  if (filterBtn) filterBtn.addEventListener('click', () => handleFilterModal('open'));
+  if (filterBtnMobile) filterBtnMobile.addEventListener('click', () => handleFilterModal('open'));
+  if (closeFilterModalBtn) closeFilterModalBtn.addEventListener('click', () => handleFilterModal('close'));
+
+  if (sortBtn) sortBtn.addEventListener('click', () => handleSortModal('open'));
+  if (sortBtnMobile) sortBtnMobile.addEventListener('click', () => handleSortModal('open'));
+  if (closeSortModalBtn) closeSortModalBtn.addEventListener('click', () => handleSortModal('close'));
+
   // Sıralama seçeneklerine tıklama olayı ekle
   const sortOptions = document.querySelectorAll('.sort-option');
   sortOptions.forEach(option => {
@@ -520,69 +710,38 @@ document.addEventListener('DOMContentLoaded', function() {
       // ...
       
       // Modalı kapat
-      sortModal.classList.add('hidden');
-      sortModal.classList.remove('flex');
+      handleSortModal('close');
     });
   });
-  
-  // Arama işlevi
-  const searchInput = document.getElementById('searchInput');
-  searchInput.addEventListener('input', function() {
-    const searchTerm = this.value.toLowerCase().trim();
-    const allProducts = document.querySelectorAll('.product-item');
+
+  // Modalların dışına tıklandığında kapatma
+  window.addEventListener('click', function(e) {
+    if (filterModal && e.target === filterModal) {
+      handleFilterModal('close');
+    }
     
-    allProducts.forEach(product => {
-        const productText = product.textContent.toLowerCase();
-        if (productText.includes(searchTerm)) {
-            product.style.display = '';
-        } else {
-            product.style.display = 'none';
-        }
-    });
-    
-    updateTotalCount();
-  });
-  
-  // Toplam ürün sayısını güncelle
-  function updateTotalCount() {
-    const visibleProducts = document.querySelectorAll('.product-item:not([style*="display: none"])');
-    document.querySelector('.text-gray-500').textContent = `Toplam ${visibleProducts.length} ürün listeleniyor`;
-  }
-  
-  // Göster seçeneği değiştiğinde
-  const showCount = document.getElementById('showCount');
-  showCount.addEventListener('change', function() {
-    const count = this.value;
-    console.log('Gösterilecek ürün sayısı:', count);
-    // Burada sayfa başına gösterilecek ürün sayısı değiştirilebilir
-    // ...
+    if (sortModal && e.target === sortModal) {
+      handleSortModal('close');
+    }
   });
 });
 
 // Filtre fonksiyonları
 function resetFilters() {
-  document.getElementById('category').value = '';
-  document.getElementById('brand').value = '';
-  document.getElementById('minPrice').value = '';
-  document.getElementById('maxPrice').value = '';
-  document.getElementById('stockAll').checked = true;
-}
+  const elements = {
+    category: document.getElementById('category'),
+    brand: document.getElementById('brand'),
+    minPrice: document.getElementById('minPrice'),
+    maxPrice: document.getElementById('maxPrice'),
+    stockAll: document.getElementById('stockAll')
+  };
 
-// Modalların dışına tıklandığında kapatma
-window.addEventListener('click', function(e) {
-  const filterModal = document.getElementById('filterModal');
-  const sortModal = document.getElementById('sortModal');
-  
-  if (e.target === filterModal) {
-    filterModal.classList.add('hidden');
-    filterModal.classList.remove('flex');
-  }
-  
-  if (e.target === sortModal) {
-    sortModal.classList.add('hidden');
-    sortModal.classList.remove('flex');
-  }
-});
+  if (elements.category) elements.category.value = '';
+  if (elements.brand) elements.brand.value = '';
+  if (elements.minPrice) elements.minPrice.value = '';
+  if (elements.maxPrice) elements.maxPrice.value = '';
+  if (elements.stockAll) elements.stockAll.checked = true;
+}
 </script>
 
 <?php include 'includes/footer.php'; ?>

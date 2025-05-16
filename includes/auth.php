@@ -12,30 +12,6 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-// GEÇİCİ: Tüm sayfaları public yapmak için kontrolleri devre dışı bıraktık
-// Aşağıdaki yorum satırlarını kaldırarak güvenlik kontrollerini tekrar aktifleştirebilirsiniz
-
-/*
-// Giriş gerektirmeyen sayfalar
-$public_pages = ['giris.php', 'cikis.php'];
-
-// Mevcut sayfa
-$current_page = basename($_SERVER['PHP_SELF']);
-
-// Eğer sayfa public değilse ve kullanıcı giriş yapmamışsa
-if (!in_array($current_page, $public_pages) && !isset($_SESSION['kullanici_id'])) {
-    header('Location: giris.php');
-    exit;
-}
-*/
-
-// GEÇİCİ: Admin rolünü otomatik olarak atama (sayfaların düzgün çalışması için)
-if (!isset($_SESSION['kullanici_id'])) {
-    $_SESSION['kullanici_id'] = 1; // Admin ID
-    $_SESSION['kullanici_adi'] = 'Geçici Admin';
-    $_SESSION['rol_id'] = 1; // Admin rolü
-}
-
 // Çerez süreleri
 define('REMEMBER_COOKIE_NAME', 'remember_token');
 define('REMEMBER_COOKIE_DURATION', 60 * 60 * 24 * 30); // 30 gün
@@ -161,24 +137,17 @@ function kullaniciCikis() {
  * Kullanıcının giriş yapmış olup olmadığını kontrol eder
  */
 function girisYapmisMi() {
-    // GEÇİCİ: Her zaman true döndür (tüm sayfalar için giriş yapılmış gibi davran)
-    return true;
-    //return isset($_SESSION['kullanici_id']);
+    return isset($_SESSION['kullanici_id']);
 }
 
 /**
  * Giriş yapmamış kullanıcıyı login sayfasına yönlendirir
  */
 function girisGerekli() {
-    // GEÇİCİ: Bu fonksiyonu devre dışı bırak
-    return true;
-    
-    /*
     if (!girisYapmisMi()) {
-        header('Location: login.php');
+        header('Location: giris.php');
         exit();
     }
-    */
 }
 
 /**
@@ -189,10 +158,6 @@ function girisGerekli() {
  * @return bool Erişim yetkisi varsa true, yoksa false
  */
 function sayfaErisimKontrol($pdo, $sayfa_url = null) {
-    // GEÇİCİ: Her zaman true döndür (tüm sayfalar için erişim izni var gibi davran)
-    return true;
-    
-    /*
     // Kullanıcı giriş yapmamışsa
     if (!girisYapmisMi()) {
         return false;
@@ -230,7 +195,6 @@ function sayfaErisimKontrol($pdo, $sayfa_url = null) {
         error_log('Sayfa erişim kontrolü hatası: ' . $e->getMessage());
         return false;
     }
-    */
 }
 
 /**
@@ -241,44 +205,30 @@ function sayfaErisimKontrol($pdo, $sayfa_url = null) {
  * @param string $yonlendir_url Erişim yetkisi yoksa yönlendirilecek URL (örn: 'index.php')
  */
 function sayfaErisimGerekli($pdo, $sayfa_url = null, $yonlendir_url = 'index.php') {
-    // GEÇİCİ: Bu fonksiyonu devre dışı bırak
-    return true;
-    
-    /*
     // Önce giriş kontrolü
     girisGerekli();
     
     // Sayfa erişim kontrolü
     if (!sayfaErisimKontrol($pdo, $sayfa_url)) {
-        // Erişim yetkisi yoksa hata mesajı ve yönlendirme
         $_SESSION['hata_mesaji'] = "Bu sayfaya erişim yetkiniz bulunmamaktadır.";
-        header("Location: $yonlendir_url");
+        header("Location: " . $yonlendir_url);
         exit();
     }
-    */
 }
 
 // Kullanıcı giriş yapmış mı kontrol et
 function checkAuth() {
-    // GEÇİCİ: Bu fonksiyonu devre dışı bırak
-    return true;
-    
-    /*
     // Eğer kullanıcı giriş yapmamışsa
     if (!isset($_SESSION['kullanici_id'])) {
         // Giriş sayfasına yönlendir
         header('Location: giris.php');
         exit;
     }
-    */
 }
 
-// GEÇİCİ: Bu kontrolü devre dışı bırak
-/*
 // Giriş sayfası hariç tüm sayfalarda oturum kontrolü yap
 $current_page = basename($_SERVER['PHP_SELF']);
 if ($current_page != 'giris.php') {
     checkAuth();
 }
-*/
 ?> 

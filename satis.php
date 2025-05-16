@@ -56,7 +56,7 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
       <input
         type="text"
         id="searchInput"
-        placeholder="Ürün ara..."
+        placeholder="Ürün ara... (Türkçe karakter destekli)"
         class="w-full pl-3 pr-10 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-primary text-xs sm:text-sm"
       >
       <button class="absolute right-0 top-0 h-full px-2 text-gray-400">
@@ -175,14 +175,24 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
           >
         </div>
       </div>
-      <!-- Diğer filtre alanları (KOD EKSİLTMEKSİZİN) -->
+      <div>
+        <label class="block text-xs sm:text-sm font-medium mb-1">Stok Durumu</label>
+        <div class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="showOutOfStock"
+            class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+          >
+          <label for="showOutOfStock" class="text-sm text-gray-700">Stokta Olmayanları Göster</label>
+        </div>
+      </div>
     </div>
     <div class="mt-4 flex justify-end gap-2">
       <button
-        onclick="toggleFilter()"
+        onclick="resetFilters()"
         class="px-3 py-1.5 text-xs sm:text-sm text-gray-600 hover:bg-gray-100 rounded-button"
       >
-        İptal
+        Sıfırla
       </button>
       <button
         onclick="applyFilter()"
@@ -210,16 +220,22 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
     </div>
     <div class="space-y-1">
       <button onclick="sortProducts('name')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded text-xs sm:text-sm">
-        İsme göre (A-Z)
+        <i class="ri-sort-asc mr-2"></i>İsme göre (A-Z)
       </button>
       <button onclick="sortProducts('name-desc')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded text-xs sm:text-sm">
-        İsme göre (Z-A)
+        <i class="ri-sort-desc mr-2"></i>İsme göre (Z-A)
       </button>
       <button onclick="sortProducts('price')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded text-xs sm:text-sm">
-        Fiyat (Düşük → Yüksek)
+        <i class="ri-sort-asc mr-2"></i>Fiyat (Düşük → Yüksek)
       </button>
       <button onclick="sortProducts('price-desc')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded text-xs sm:text-sm">
-        Fiyat (Yüksek → Düşük)
+        <i class="ri-sort-desc mr-2"></i>Fiyat (Yüksek → Düşük)
+      </button>
+      <button onclick="sortProducts('stock')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded text-xs sm:text-sm">
+        <i class="ri-sort-asc mr-2"></i>Stok (Az → Çok)
+      </button>
+      <button onclick="sortProducts('stock-desc')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded text-xs sm:text-sm">
+        <i class="ri-sort-desc mr-2"></i>Stok (Çok → Az)
       </button>
     </div>
   </div>
@@ -573,11 +589,16 @@ let selectedCustomer = null;
 let searchValue = '';
 const currentView = 'grid'; // Her zaman grid görünümü kullanılacak
 
+// Filtre değişkenleri
+let showOutOfStock = false;
+let minPrice = 0;
+let maxPrice = Infinity;
+
+// Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', () => {
   initEvents();
-  // İlk yüklemede tüm ürünleri göster
-  filteredProducts = [...products];
-  renderProducts();
+  loadCartFromLocalStorage(); // Sepeti yükle
+  filterAndRenderProducts();
   renderCustomerList();
 });
 
@@ -620,13 +641,30 @@ function initEvents(){
   
   // Müşteri Arama
   document.getElementById('customerSearch').addEventListener('input',(e)=>{
-    const val=e.target.value.toLowerCase();
-    const filtered=customersFromDB.filter(c=>{
-      const fn=(c.ad+' '+(c.soyad||'')).toLowerCase();
-      return fn.includes(val);
+    const val = convertTurkishToBasic(e.target.value.toLowerCase());
+    const filtered = customersFromDB.filter(c => {
+      const fullName = convertTurkishToBasic((c.ad + ' ' + (c.soyad || '')).toLowerCase());
+      return fullName.includes(val);
     });
     renderCustomerList(filtered);
   });
+}
+
+// Türkçe karakter dönüşüm fonksiyonu
+function convertTurkishToBasic(text) {
+  const turkishChars = {
+    'ı': 'i', 'İ': 'i',
+    'ğ': 'g', 'Ğ': 'g',
+    'ü': 'u', 'Ü': 'u',
+    'ş': 's', 'Ş': 's',
+    'ö': 'o', 'Ö': 'o',
+    'ç': 'c', 'Ç': 'c',
+    'â': 'a', 'Â': 'a',
+    'î': 'i', 'Î': 'i',
+    'û': 'u', 'Û': 'u'
+  };
+  
+  return text.replace(/[ıİğĞüÜşŞöÖçÇâÂîÎûÛ]/g, letter => turkishChars[letter] || letter);
 }
 
 // Ürünleri arama terimlerine göre filtrele
@@ -636,17 +674,19 @@ function filterProductsBySearch() {
     return;
   }
   
-  const searchTerms = searchValue.toLowerCase().split(' ').filter(term => term.length > 0);
+  const searchTerms = searchValue.toLowerCase().split(' ')
+    .filter(term => term.length > 0)
+    .map(term => convertTurkishToBasic(term));
   
   filteredProducts = products.filter(product => {
-    // Aranacak alanları birleştir
-    const searchableText = [
+    // Aranacak alanları birleştir ve Türkçe karakterleri dönüştür
+    const searchableText = convertTurkishToBasic([
       product.urun_adi || '',
       product.urun_kodu || '',
       product.barkod || '',
       `${product.stok_miktari} ${product.olcum_birimi}`,
       formatCurrency(product.satis_fiyati)
-    ].filter(Boolean).join(' ').toLowerCase();
+    ].filter(Boolean).join(' ').toLowerCase());
     
     // Tüm arama terimlerini kontrol et
     return searchTerms.every(term => searchableText.includes(term));
@@ -680,10 +720,17 @@ function toggleCustomerModal(){
 }
 
 function selectCustomer(id){
-  const found=customersFromDB.find(x=> x.id==id);
+  const found = customersFromDB.find(x => x.id == id);
   if(!found) return;
-  selectedCustomer=found;
-  document.getElementById('selectedCustomerName').textContent=`${found.ad} ${found.soyad||''}`;
+  selectedCustomer = found;
+  
+  // Müşteri adı ve bakiye bilgisini göster
+  const customerNameElement = document.getElementById('selectedCustomerName');
+  customerNameElement.innerHTML = `
+    <div class="font-medium">${found.ad} ${found.soyad || ''}</div>
+    <div class="text-sm text-gray-500">Bakiye: ${parseFloat(found.cari_bakiye).toLocaleString('tr-TR')} ₺</div>
+  `;
+  
   toggleCustomerModal();
 }
 
@@ -800,21 +847,189 @@ function toggleCart(){
   c.classList.toggle('hidden');
   c.classList.toggle('show');
 }
+
+// Sepet işlemleri için localStorage fonksiyonları
+function saveCartToLocalStorage() {
+  try {
+    localStorage.setItem('cart', JSON.stringify(cart));
+    localStorage.setItem('selectedCustomer', JSON.stringify(selectedCustomer));
+    localStorage.setItem('orderNote', document.getElementById('orderNote')?.value || '');
+    localStorage.setItem('discountRate', document.getElementById('discountRate')?.value || '0');
+  } catch (error) {
+    console.error('Sepet kaydetme hatası:', error);
+  }
+}
+
+function loadCartFromLocalStorage() {
+  try {
+    // Sepet verilerini yükle
+    const savedCart = localStorage.getItem('cart');
+    if (savedCart) {
+      cart = JSON.parse(savedCart);
+    }
+
+    // Seçili müşteri verilerini yükle
+    const savedCustomer = localStorage.getItem('selectedCustomer');
+    if (savedCustomer) {
+      selectedCustomer = JSON.parse(savedCustomer);
+      if (selectedCustomer) {
+        const customerNameElement = document.getElementById('selectedCustomerName');
+        if (customerNameElement) {
+          customerNameElement.innerHTML = `
+            <div class="font-medium">${selectedCustomer.ad} ${selectedCustomer.soyad || ''}</div>
+            <div class="text-sm text-gray-500">Bakiye: ${parseFloat(selectedCustomer.cari_bakiye).toLocaleString('tr-TR')} ₺</div>
+          `;
+        }
+      }
+    }
+
+    // Sipariş notunu yükle
+    const savedNote = localStorage.getItem('orderNote');
+    if (savedNote) {
+      const orderNoteElement = document.getElementById('orderNote');
+      const orderNoteTextElement = document.getElementById('orderNoteText');
+      if (orderNoteElement) orderNoteElement.value = savedNote;
+      if (orderNoteTextElement) {
+        orderNoteTextElement.textContent = savedNote || 'Sipariş Notu Ekle';
+      }
+    }
+
+    // İskonto oranını yükle
+    const savedDiscount = localStorage.getItem('discountRate');
+    if (savedDiscount) {
+      const discountElement = document.getElementById('discountRate');
+      if (discountElement) {
+        discountElement.value = savedDiscount;
+        calculateTotal(); // Toplamı güncelle
+      }
+    }
+
+    // Sepet arayüzünü güncelle
+    updateCartCount();
+    renderCart();
+  } catch (error) {
+    console.error('Sepet yükleme hatası:', error);
+  }
+}
+
+function clearCartStorage() {
+  try {
+    localStorage.removeItem('cart');
+    localStorage.removeItem('selectedCustomer');
+    localStorage.removeItem('orderNote');
+    localStorage.removeItem('discountRate');
+    cart = [];
+    selectedCustomer = null;
+    
+    // Arayüzü temizle
+    document.getElementById('selectedCustomerName').textContent = 'Müşteri Seç';
+    document.getElementById('orderNote').value = '';
+    document.getElementById('orderNoteText').textContent = 'Sipariş Notu Ekle';
+    document.getElementById('discountRate').value = '0';
+    
+    updateCartCount();
+    renderCart();
+    calculateTotal();
+  } catch (error) {
+    console.error('Sepet temizleme hatası:', error);
+  }
+}
+
+// Sepet işlemlerini güncelle
 function addToCart(productId) {
     productId = parseInt(productId);
     const product = products.find(p => p.id === productId);
     if (!product) {
         alert('Ürün bulunamadı!');
-    return;
-  }
+        return;
+    }
     
     if (product.stok_miktari < 1) {
         alert('Bu ürün stokta yok!');
         return;
     }
     
-    // Adet seçimi için modal göster
     showQtyModal(productId);
+}
+
+function removeFromCart(productId) {
+    const index = cart.findIndex(item => item.id === productId);
+    if (index === -1) return;
+    
+    cart.splice(index, 1);
+    updateCartCount();
+    renderCart();
+    saveCartToLocalStorage(); // Sepeti kaydet
+}
+
+function clearCart(){
+  if(confirm("Sepeti temizlemek istiyor musunuz?")){
+    clearCartStorage(); // Tüm sepet verilerini temizle
+  }
+}
+
+function confirmAddToCart() {
+    const product = products.find(p => p.id === selectedProductId);
+    if (!product) {
+        alert('Ürün bulunamadı!');
+        return;
+    }
+    
+    const qtyInput = document.getElementById('modalQty');
+    let qty = 0;
+    let olcumBirimi = product.olcum_birimi;
+    
+    if (product.olcum_birimi === 'adet') {
+        qty = parseInt(qtyInput.value) || 1;
+    } else {
+        qty = parseFloat(qtyInput.value.replace(/\./g, '').replace(',', '.')) || 0.1;
+        if (document.getElementById('weightUnit')) {
+            olcumBirimi = document.getElementById('weightUnit').value;
+        }
+    }
+    
+    if (qty > product.stok_miktari) {
+        alert('Yetersiz stok!');
+        qtyInput.value = product.stok_miktari;
+        return;
+    }
+    
+    const existingItem = cart.find(item => item.id === selectedProductId);
+    if (existingItem) {
+        existingItem.qty = qty;
+        existingItem.olcumBirimi = olcumBirimi;
+    } else {
+        cart.push({
+            id: product.id,
+            name: product.urun_adi,
+            price: parseFloat(product.satis_fiyati),
+            qty: qty,
+            olcumBirimi: olcumBirimi
+        });
+    }
+    
+    updateCartCount();
+    renderCart();
+    saveCartToLocalStorage(); // Sepeti kaydet
+    
+    toggleCart();
+    closeQtyModal();
+}
+
+function saveOrderNote(){
+  const val = document.getElementById('orderNote').value;
+  document.getElementById('orderNoteText').textContent = val || 'Sipariş Notu Ekle';
+  toggleOrderNoteModal();
+  saveCartToLocalStorage(); // Sepeti kaydet
+}
+
+function saveItemNote(){
+  const val = document.getElementById('itemNote').value;
+  let it = cart.find(x => x.id === currentItemNoteId);
+  if(it) it.note = val;
+  toggleItemNoteModal();
+  renderCart();
+  saveCartToLocalStorage(); // Sepeti kaydet
 }
 
 // Adet Seçim Modal
@@ -999,184 +1214,6 @@ function increaseModalQty() {
     }
 }
 
-function confirmAddToCart() {
-    const product = products.find(p => p.id === selectedProductId);
-    if (!product) {
-        alert('Ürün bulunamadı!');
-        return;
-    }
-    
-    const qtyInput = document.getElementById('modalQty');
-    let qty = 0;
-    let olcumBirimi = product.olcum_birimi;
-    
-    if (product.olcum_birimi === 'adet') {
-        qty = parseInt(qtyInput.value) || 1;
-    } else {
-        // Sayısal değeri al (binlik ayırıcıları kaldırarak)
-        qty = parseFloat(qtyInput.value.replace(/\./g, '').replace(',', '.')) || 0.1;
-        // Eğer ağırlık birimi seçildiyse, seçilen birimi al
-        if (document.getElementById('weightUnit')) {
-            olcumBirimi = document.getElementById('weightUnit').value;
-        }
-    }
-    
-    // Stok kontrolü
-    if (qty > product.stok_miktari) {
-        alert('Yetersiz stok!');
-        qtyInput.value = product.stok_miktari;
-        return;
-    }
-    
-    // Sepette var mı kontrol et
-    const existingItem = cart.find(item => item.id === selectedProductId);
-    if (existingItem) {
-        existingItem.qty = qty;
-        existingItem.olcumBirimi = olcumBirimi;
-    } else {
-        cart.push({
-            id: product.id,
-            name: product.urun_adi,
-            price: parseFloat(product.satis_fiyati),
-            qty: qty,
-            olcumBirimi: olcumBirimi
-        });
-    }
-    
-    // Sepeti güncelle
-    updateCartCount();
-    renderCart();
-    
-    // Sepeti göster
-    toggleCart();
-    
-    // Modal'ı kapat
-    closeQtyModal();
-}
-
-function removeFromCart(productId) {
-    const index = cart.findIndex(item => item.id === productId);
-    if (index === -1) return;
-    
-    cart.splice(index, 1);
-    updateCartCount();
-    renderCart();
-}
-function clearCart(){
-  if(confirm("Sepeti temizlemek istiyor musunuz?")){
-    cart=[];
-    updateCartCount();
-    renderCart();
-  }
-}
-function updateCartCount(){
-  const uniqueItems = cart.length; // Benzersiz kalem sayısı
-  document.getElementById('cartCount').textContent = uniqueItems;
-}
-function renderCart(){
-  const cItems=document.getElementById('cartItems');
-  cItems.innerHTML= cart.map(i=>`
-    <div class="flex gap-4 p-4 bg-gray-50 rounded-lg">
-      <div class="flex-1">
-        <h4 class="font-medium">${i.name}</h4>
-        <p class="text-sm text-gray-500">Kod: PRD${String(i.id).padStart(4, '0')}</p>
-        ${
-          i.note
-            ? `<button class="text-sm text-blue-500 mt-1" onclick="openItemNoteModal(${i.id})">${i.note}</button>`
-            : `<button class="text-sm text-blue-500 mt-1" onclick="openItemNoteModal(${i.id})">Not Düzenle</button>`
-        }
-      </div>
-      <div class="flex flex-col items-end justify-between">
-        <div class="flex items-center">
-          <button class="px-2 py-1 bg-gray-200 rounded-l" onclick="decreaseQty(${i.id})">-</button>
-          <input 
-            type="number"
-            class="w-16 text-center border-t border-b"
-            value="${i.qty}"
-            onchange="updateQty(${i.id}, this.value)"
-            ${i.olcumBirimi !== 'adet' ? 'step="0.001" min="0.001"' : 'min="1"'}
-          >
-          ${i.olcumBirimi !== 'adet' ? 
-            `<span class="px-2 py-1 border-t border-b bg-gray-50">${i.olcumBirimi}</span>` : 
-            ''}
-          <button class="px-2 py-1 bg-gray-200 rounded-r" onclick="increaseQty(${i.id})">+</button>
-        </div>
-        <button class="p-1 text-red-500 hover:bg-red-50 rounded" onclick="removeFromCart(${i.id})">
-          <i class="ri-delete-bin-line"></i>
-        </button>
-      </div>
-    </div>
-  `).join('') || '<div class="text-center py-8 text-gray-500">Sepetinizde ürün bulunmuyor.</div>';
-  
-  // Toplam hesapla
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  const discountAmount = 0; // İndirim tutarı (şimdilik 0)
-  const total = subtotal - discountAmount;
-  
-  document.getElementById('subtotal').textContent = formatCurrency(subtotal);
-  document.getElementById('discountAmount').textContent = formatCurrency(discountAmount);
-  document.getElementById('total').textContent = formatCurrency(total);
-}
-function updateQty(id, value) {
-  const item = cart.find(i => i.id === id);
-  if (!item) return;
-  
-  const product = products.find(p => p.id === id);
-  if (!product) return;
-  
-  if (item.olcumBirimi === 'adet') {
-    let qty = parseInt(value) || 1;
-    if (qty < 1) qty = 1;
-    if (qty > product.stok_miktari) qty = product.stok_miktari;
-    item.qty = qty;
-  } else {
-    let qty = parseFloat(value) || 0.001;
-    if (qty < 0.001) qty = 0.001;
-    if (qty > product.stok_miktari) qty = product.stok_miktari;
-    item.qty = qty;
-  }
-  
-  renderCart();
-}
-function increaseQty(id) {
-  const item = cart.find(i => i.id === id);
-  if (!item) return;
-  
-  const product = products.find(p => p.id === id);
-  if (!product) return;
-  
-  if (item.olcumBirimi === 'adet') {
-    if (item.qty < product.stok_miktari) {
-      item.qty++;
-    }
-  } else {
-    let step = item.olcumBirimi === 'kg' ? 0.1 : 100;
-    if (item.qty + step <= product.stok_miktari) {
-      item.qty = parseFloat((item.qty + step).toFixed(item.olcumBirimi === 'kg' ? 3 : 0));
-    }
-  }
-  
-  renderCart();
-}
-function decreaseQty(id) {
-  const item = cart.find(i => i.id === id);
-  if (!item) return;
-  
-  const product = products.find(p => p.id === id);
-  
-  if (item.olcumBirimi === 'adet') {
-    if (item.qty > 1) {
-      item.qty--;
-    }
-  } else {
-    let step = item.olcumBirimi === 'kg' ? 0.1 : 100;
-    if (item.qty > step) {
-      item.qty = parseFloat((item.qty - step).toFixed(item.olcumBirimi === 'kg' ? 3 : 0));
-    }
-  }
-  
-  renderCart();
-}
 function calculateTotal(){
   let subtotal=0;
   cart.forEach(i=> subtotal+=(i.price*i.qty));
@@ -1190,49 +1227,103 @@ function calculateTotal(){
 
 // Filtre
 function toggleFilter(){
-  const fm=document.getElementById('filterModal');
+  const fm = document.getElementById('filterModal');
   fm.classList.toggle('hidden');
   fm.classList.toggle('show');
 }
+
+function resetFilters(){
+  document.getElementById('minPrice').value = '';
+  document.getElementById('maxPrice').value = '';
+  document.getElementById('showOutOfStock').checked = false;
+  showOutOfStock = false;
+  minPrice = 0;
+  maxPrice = Infinity;
+  filterAndRenderProducts();
+}
+
 function applyFilter(){
-  const minP=parseFloat(document.getElementById('minPrice').value)||0;
-  const maxP=parseFloat(document.getElementById('maxPrice').value)||999999999;
-  products=products.filter(x=> x.satis_fiyati>=minP && x.satis_fiyati<=maxP);
-  renderProducts();
+  minPrice = parseFloat(document.getElementById('minPrice').value) || 0;
+  maxPrice = parseFloat(document.getElementById('maxPrice').value) || Infinity;
+  showOutOfStock = document.getElementById('showOutOfStock').checked;
+  
+  filterAndRenderProducts();
   toggleFilter();
 }
 
 // Sıralama
 function toggleSort(){
-  const sm=document.getElementById('sortModal');
+  const sm = document.getElementById('sortModal');
   sm.classList.toggle('hidden');
   sm.classList.toggle('show');
 }
+
 function sortProducts(type){
   switch(type){
     case 'name':
-      products.sort((a,b)=> a.urun_adi.localeCompare(b.urun_adi));
+      filteredProducts.sort((a,b) => a.urun_adi.localeCompare(b.urun_adi, 'tr'));
       break;
     case 'name-desc':
-      products.sort((a,b)=> b.urun_adi.localeCompare(a.urun_adi));
+      filteredProducts.sort((a,b) => b.urun_adi.localeCompare(a.urun_adi, 'tr'));
       break;
     case 'price':
-      products.sort((a,b)=> a.satis_fiyati-b.satis_fiyati);
+      filteredProducts.sort((a,b) => parseFloat(a.satis_fiyati) - parseFloat(b.satis_fiyati));
       break;
     case 'price-desc':
-      products.sort((a,b)=> b.satis_fiyati-a.satis_fiyati);
+      filteredProducts.sort((a,b) => parseFloat(b.satis_fiyati) - parseFloat(a.satis_fiyati));
+      break;
+    case 'stock':
+      filteredProducts.sort((a,b) => parseFloat(a.stok_miktari) - parseFloat(b.stok_miktari));
+      break;
+    case 'stock-desc':
+      filteredProducts.sort((a,b) => parseFloat(b.stok_miktari) - parseFloat(a.stok_miktari));
       break;
   }
   renderProducts();
   toggleSort();
 }
 
-// Görünüm değiştirme
-// Bu fonksiyon artık kullanılmıyor - sadece grid görünümü kullanıyoruz
+// Ürünleri filtrele ve göster
+function filterAndRenderProducts() {
+  // Önce arama filtresini uygula
+  let filtered = [...products]; // Orijinal products dizisini kopyala
+  if (searchValue) {
+    const searchTerms = searchValue.toLowerCase().split(' ')
+      .filter(term => term.length > 0)
+      .map(term => convertTurkishToBasic(term));
+    
+    filtered = filtered.filter(product => {
+      const searchableText = convertTurkishToBasic([
+        product.urun_adi || '',
+        product.urun_kodu || '',
+        product.barkod || '',
+        `${product.stok_miktari} ${product.olcum_birimi}`,
+        formatCurrency(product.satis_fiyati)
+      ].filter(Boolean).join(' ').toLowerCase());
+      
+      return searchTerms.every(term => searchableText.includes(term));
+    });
+  }
+  
+  // Sonra fiyat ve stok filtrelerini uygula
+  filteredProducts = filtered.filter(product => {
+    const price = parseFloat(product.satis_fiyati);
+    const inStockFilter = showOutOfStock ? true : parseFloat(product.stok_miktari) > 0;
+    return price >= minPrice && price <= maxPrice && inStockFilter;
+  });
+  
+  renderProducts();
+}
 
-// Sayfa yüklendiğinde tercih edilen görünümü uygula
+// Arama olayını güncelle
+document.getElementById('searchInput').addEventListener('input', function(e) {
+  searchValue = e.target.value.trim();
+  filterAndRenderProducts();
+});
+
+// Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', function() {
-    // Grid görünümü her zaman aktif
+  filterAndRenderProducts();
 });
 
 // Sipariş Notu
@@ -1245,11 +1336,6 @@ function toggleOrderNoteModal(){
   const n=document.getElementById('orderNoteModal');
   n.classList.toggle('hidden');
   n.classList.toggle('show');
-}
-function saveOrderNote(){
-  const val=document.getElementById('orderNote').value;
-  document.getElementById('orderNoteText').textContent= val||'Sipariş Notu Ekle';
-  toggleOrderNoteModal();
 }
 
 // Ürün Notu
@@ -1267,13 +1353,6 @@ function toggleItemNoteModal(){
   mo.classList.toggle('hidden');
   mo.classList.toggle('show');
 }
-function saveItemNote(){
-  const val=document.getElementById('itemNote').value;
-  let it= cart.find(x=> x.id===currentItemNoteId);
-  if(it) it.note=val;
-  toggleItemNoteModal();
-  renderCart();
-}
 
 // Siparişi Tamamla
 function completeOrder(){
@@ -1285,28 +1364,27 @@ function completeOrder(){
     alert("Sepet boş!");
     return;
   }
-  const discountRate= parseFloat(document.getElementById('discountRate').value)||0;
-  const note= document.getElementById('orderNote').value||'';
-  const postData={
+  
+  const discountRate = parseFloat(document.getElementById('discountRate').value) || 0;
+  const note = document.getElementById('orderNote').value || '';
+  const postData = {
     musteri_id: selectedCustomer.id,
     items: cart,
     discountRate,
     note
   };
 
-  fetch('satis_kaydet.php',{
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
+  fetch('satis_kaydet.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(postData)
   })
   .then(async r => {
-    // r.ok kontrolü
     if(!r.ok){
       const errorText = await r.text();
       console.error('HTTP Hatası:', r.status, errorText);
       throw new Error('HTTP Hatası: ' + r.status + ' - ' + errorText);
     }
-    // JSON parse
     try {
       return await r.json();
     } catch (e) {
@@ -1316,26 +1394,22 @@ function completeOrder(){
       throw new Error('JSON parse hatası: ' + e.message);
     }
   })
-  .then(resp=>{
+  .then(resp => {
     console.log('Sunucu yanıtı:', resp);
     if(resp.success){
       alert("Sipariş başarıyla kaydedildi! Fatura No: " + resp.fatura_id);
-      cart=[];
-      updateCartCount();
-      renderCart();
-      document.getElementById('orderNote').value='';
-      document.getElementById('orderNoteText').textContent='Sipariş Notu Ekle';
+      clearCartStorage(); // Başarılı sipariş sonrası sepeti temizle
     } else {
       console.error('Sipariş hatası:', resp);
-      alert("Sipariş kaydedilirken hata: "+(resp.message||'Bilinmeyen hata'));
+      alert("Sipariş kaydedilirken hata: " + (resp.message || 'Bilinmeyen hata'));
       if (resp.error) {
         console.error('Detaylı hata:', resp.error);
       }
     }
   })
-  .catch(err=>{
+  .catch(err => {
     console.error('Fetch hatası:', err);
-    alert("Sunucu hatası: "+err.message);
+    alert("Sunucu hatası: " + err.message);
   });
 }
 
@@ -1864,3 +1938,82 @@ function formatStockDisplay(stok_miktari, olcum_birimi, stok_kg) {
 </script>
 
 <?php include 'includes/footer.php'; ?>
+
+<!-- Sayfanın en altına eklenecek script -->
+<script src="assets/js/search.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const customerSearch = document.getElementById('customerSearch');
+    const products = <?= json_encode($urunler, JSON_NUMERIC_CHECK) ?>;
+    const customers = <?= json_encode($customerRows, JSON_NUMERIC_CHECK) ?>;
+    let filteredProducts = [...products];
+    let filteredCustomers = [...customers];
+    
+    // Ürün arama fonksiyonu
+    searchInput.addEventListener('input', function() {
+        const searchText = this.value.trim();
+        filteredProducts = searchProducts(searchText, products);
+        displayProducts(filteredProducts);
+    });
+    
+    // Müşteri arama fonksiyonu
+    customerSearch.addEventListener('input', function() {
+        const searchText = this.value.trim();
+        filteredCustomers = searchCustomers(searchText, customers);
+        displayCustomers(filteredCustomers);
+    });
+    
+    // Ürünleri görüntüleme fonksiyonu
+    function displayProducts(products) {
+        const gridContainer = document.getElementById('productGrid');
+        const searchText = searchInput.value.trim();
+        
+        gridContainer.innerHTML = products.map(product => `
+            <div class="product-card bg-white p-2 rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
+                 onclick="addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})">
+                <div class="aspect-square bg-gray-100 rounded-lg mb-2 overflow-hidden">
+                    <img src="${product.resim_url || 'resimyok.jpg'}" 
+                         alt="${product.urun_adi}"
+                         class="w-full h-full object-contain">
+                </div>
+                <div>
+                    <h3 class="font-medium text-sm text-gray-900 line-clamp-2">
+                        ${highlightSearchResults(product.urun_adi, searchText)}
+                    </h3>
+                    <div class="mt-1 text-xs text-gray-500">
+                        Stok: ${product.stok_miktari} ${product.olcum_birimi}
+                    </div>
+                    <div class="mt-2 flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-900">
+                            ${parseFloat(product.satis_fiyati).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₺
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Müşterileri görüntüleme fonksiyonu
+    function displayCustomers(customers) {
+        const customerList = document.getElementById('customerList');
+        const searchText = customerSearch.value.trim();
+        
+        customerList.innerHTML = customers.map(customer => `
+            <button
+                onclick="selectCustomer(${customer.id}, '${customer.ad} ${customer.soyad}')"
+                class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-xs sm:text-sm"
+            >
+                ${highlightSearchResults(`${customer.ad} ${customer.soyad}`, searchText)}
+                <div class="text-xs text-gray-500">
+                    Cari Bakiye: ${parseFloat(customer.cari_bakiye).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₺
+                </div>
+            </button>
+        `).join('');
+    }
+    
+    // İlk yükleme
+    displayProducts(products);
+    displayCustomers(customers);
+});
+</script>

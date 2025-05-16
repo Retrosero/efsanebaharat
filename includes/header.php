@@ -15,10 +15,6 @@ header("Pragma: no-cache");
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
-// GEÇİCİ: Tüm sayfaları public yapmak için kontrolleri devre dışı bıraktık
-// Aşağıdaki yorum satırlarını kaldırarak güvenlik kontrollerini tekrar aktifleştirebilirsiniz
-
-/*
 // Giriş gerektirmeyen sayfalar
 $public_pages = ['giris.php', 'cikis.php', 'error.php'];
 
@@ -40,59 +36,13 @@ if (!in_array($current_page, $public_pages)) {
     }
 }
 
-// Giriş kontrolü
-girisGerekli();
-
 // Login ve error sayfaları için kontrol yapma
-$exempt_pages = ['login.php', 'logout.php', 'error.php'];
+$exempt_pages = ['giris.php', 'cikis.php', 'error.php'];
 
 // Muaf sayfalar dışında oturum kontrolü yap
 if (!in_array($current_page, $exempt_pages)) {
-    if (!isset($_SESSION['kullanici_id'])) {
-        header('Location: login.php');
-        exit;
-    }
-}
-*/
-
-// GEÇİCİ: Admin rolünü otomatik olarak atama (sayfaların düzgün çalışması için)
-if (!isset($_SESSION['kullanici_id'])) {
-    $_SESSION['kullanici_id'] = 1; // Admin ID
-    $_SESSION['kullanici_adi'] = 'Geçici Admin';
-    $_SESSION['rol_id'] = 1; // Admin rolü
-}
-
-// Giriş gerektirmeyen sayfalar
-$public_pages = ['giris.php', 'cikis.php', 'error.php'];
-
-// Mevcut sayfa
-$current_page = basename($_SERVER['PHP_SELF']);
-
-// Eğer sayfa public değilse ve kullanıcı giriş yapmamışsa
-if (!in_array($current_page, $public_pages)) {
     if (!isset($_SESSION['kullanici_id'])) {
         header('Location: giris.php');
-        exit;
-    }
-    
-    // Sayfa erişim kontrolü
-    if (!sayfaErisimKontrol($pdo, $current_page)) {
-        $_SESSION['hata_mesaji'] = "Bu sayfaya erişim yetkiniz bulunmamaktadır.";
-        header("Location: error.php");
-        exit();
-    }
-}
-
-// Giriş kontrolü
-girisGerekli();
-
-// Login ve error sayfaları için kontrol yapma
-$exempt_pages = ['login.php', 'logout.php', 'error.php'];
-
-// Muaf sayfalar dışında oturum kontrolü yap
-if (!in_array($current_page, $exempt_pages)) {
-    if (!isset($_SESSION['kullanici_id'])) {
-        header('Location: login.php');
         exit;
     }
 }
