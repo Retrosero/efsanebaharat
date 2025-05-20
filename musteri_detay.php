@@ -79,7 +79,7 @@ $vergiDairesi = $musteri['vergi_dairesi'];
 $hesapAcilis = date('d.m.Y', strtotime($musteri['created_at']));
 
 // Bakiyeler
-$cariBakiye = hesaplaGuncelBakiye($pdo, $musteri['id']);
+$cariBakiye = getMusteriCariBakiye($pdo, $musteri['id']);
 $cariBakiyeFormatted = number_format($cariBakiye, 2, ',', '.');
 
 // Döviz bakiyelerini güncelle
@@ -90,30 +90,64 @@ $usdBakiye = $musteri['usd_bakiye'] ?? 0;
 $eurBakiye = $musteri['eur_bakiye'] ?? 0;
 $gbpBakiye = $musteri['gbp_bakiye'] ?? 0;
 
-// Dinamik Cari Bakiye (Satış - Tahsilat)
+// Dinamik Cari Bakiye Hesaplama
 function getMusteriCariBakiye($pdo, $musteri_id){
-    // Toplam satış
+    // Toplam satış (Müşteriyi borçlandırır: +)
     $stmtS = $pdo->prepare("
         SELECT COALESCE(SUM(toplam_tutar),0) AS toplamSatis
         FROM faturalar
         WHERE musteri_id=:mid
           AND fatura_turu='satis'
+          AND iptal = 0
     ");
     $stmtS->execute([':mid'=>$musteri_id]);
     $rowS = $stmtS->fetch(PDO::FETCH_ASSOC);
     $toplamSatis = $rowS ? (float)$rowS['toplamSatis'] : 0;
 
-    // Toplam tahsilat
+    // Toplam alış (Müşteriden alım yapıldı, müşteriye borcumuz var: -)
+    $stmtA = $pdo->prepare("
+        SELECT COALESCE(SUM(toplam_tutar),0) AS toplamAlis
+        FROM faturalar
+        WHERE musteri_id=:mid
+          AND fatura_turu='alis'
+          AND iptal = 0
+    ");
+    $stmtA->execute([':mid'=>$musteri_id]);
+    $rowA = $stmtA->fetch(PDO::FETCH_ASSOC);
+    $toplamAlis = $rowA ? (float)$rowA['toplamAlis'] : 0;
+
+    // Toplam tahsilat (Müşteriden para aldık, borcu azalır: -)
     $stmtT = $pdo->prepare("
         SELECT COALESCE(SUM(tutar),0) AS toplamTahsilat
         FROM odeme_tahsilat
         WHERE musteri_id=:mid
+          AND islem_turu='tahsilat'
+          AND onayli=1
     ");
     $stmtT->execute([':mid'=>$musteri_id]);
     $rowT = $stmtT->fetch(PDO::FETCH_ASSOC);
     $toplamTahsilat = $rowT ? (float)$rowT['toplamTahsilat'] : 0;
 
-    return $toplamSatis - $toplamTahsilat;
+    // Toplam tediye (Müşteriye ödeme yaptık, borcumuz azalır: +)
+    $stmtTed = $pdo->prepare("
+        SELECT COALESCE(SUM(tutar),0) AS toplamTediye
+        FROM odeme_tahsilat
+        WHERE musteri_id=:mid
+          AND islem_turu='tediye'
+          AND onayli=1
+    ");
+    $stmtTed->execute([':mid'=>$musteri_id]);
+    $rowTed = $stmtTed->fetch(PDO::FETCH_ASSOC);
+    $toplamTediye = $rowTed ? (float)$rowTed['toplamTediye'] : 0;
+
+    // Bakiye hesaplama:
+    // Pozitif bakiye: Müşteri bize borçlu
+    // Negatif bakiye: Biz müşteriye borçluyuz
+    // Satış: Müşteriyi borçlandırır (+)
+    // Alış: Biz borçlanırız (-)
+    // Tahsilat: Müşteri borcunu öder (-)
+    // Tediye: Biz borcumuzu öderiz (+)
+    return $toplamSatis - $toplamAlis - $toplamTahsilat + $toplamTediye;
 }
 
 // Ciro bilgisi için fonksiyonlar
@@ -307,7 +341,7 @@ try {
         o.aciklama,
         o.islem_tarihi,
         o.created_at,
-        'Tahsilat' AS tur
+        o.islem_turu AS tur
       FROM odeme_tahsilat o
       WHERE o.musteri_id=:mid2
 
@@ -601,11 +635,12 @@ try {
             <?php 
               $islemTarihi = date('d.m.Y', strtotime($hareket['islem_tarihi']));
               $tutarFormatted = number_format($hareket['tutar'], 2, ',', '.');
-              $islemTuru = $hareket['tur'] === 'Satis' ? 'Satış' : ($hareket['tur'] === 'Alis' ? 'Alış' : 'Tahsilat');
-              $tutarClass = $hareket['tur'] === 'Satis' ? 'text-red-600' : ($hareket['tur'] === 'Alis' ? 'text-green-600' : 'text-green-600');
-              $tutarPrefix = $hareket['tur'] === 'Satis' ? '-' : '+';
+              $islemTuru = $hareket['tur'] === 'Satis' ? 'Satış' : ($hareket['tur'] === 'Alis' ? 'Alış' : ($hareket['tur'] === 'tediye' ? 'Tediye' : 'Tahsilat'));
+              $tutarClass = $hareket['tur'] === 'Satis' ? 'text-red-600' : ($hareket['tur'] === 'Alis' ? 'text-green-600' : ($hareket['tur'] === 'tediye' ? 'text-red-600' : 'text-green-600'));
+              $tutarPrefix = $hareket['tur'] === 'Satis' || $hareket['tur'] === 'tediye' ? '-' : '+';
               $detayUrl = $hareket['tur'] === 'Satis' ? "fatura_detay.php?id={$hareket['rec_id']}" : 
-                         ($hareket['tur'] === 'Alis' ? "fatura_detay.php?id={$hareket['rec_id']}" : "tahsilat_detay.php?id={$hareket['rec_id']}");
+                         ($hareket['tur'] === 'Alis' ? "fatura_detay.php?id={$hareket['rec_id']}" : 
+                         ($hareket['tur'] === 'tediye' ? "tediye_detay.php?id={$hareket['rec_id']}" : "tahsilat_detay.php?id={$hareket['rec_id']}"));
               
               // Para birimi sembollerini ekle
               $paraBirimiSembol = '₺';

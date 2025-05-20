@@ -68,53 +68,59 @@ if (!function_exists('getMusteriCariBakiye')) {
 if (!function_exists('hesaplaGuncelBakiye')) {
     function hesaplaGuncelBakiye($pdo, $musteri_id) {
         // SATIŞLAR
-            $stmtSatis = $pdo->prepare("
+        $stmtSatis = $pdo->prepare("
             SELECT COALESCE(SUM(toplam_tutar), 0) AS toplam
-                FROM faturalar
+            FROM faturalar
             WHERE musteri_id = :musteri_id 
               AND fatura_turu = 'satis'
               AND para_birimi = 'TRY'
-            ");
+              AND iptal = 0
+        ");
         $stmtSatis->execute([':musteri_id' => $musteri_id]);
         $satislar = $stmtSatis->fetchColumn();
 
         // ALIŞLAR
-            $stmtAlis = $pdo->prepare("
+        $stmtAlis = $pdo->prepare("
             SELECT COALESCE(SUM(toplam_tutar), 0) AS toplam
-                FROM faturalar
+            FROM faturalar
             WHERE musteri_id = :musteri_id 
               AND fatura_turu = 'alis'
               AND para_birimi = 'TRY'
-            ");
+              AND iptal = 0
+        ");
         $stmtAlis->execute([':musteri_id' => $musteri_id]);
         $alislar = $stmtAlis->fetchColumn();
 
         // TAHSİLATLAR
-            $stmtTahsilat = $pdo->prepare("
+        $stmtTahsilat = $pdo->prepare("
             SELECT COALESCE(SUM(tutar), 0) AS toplam
             FROM odeme_tahsilat 
             WHERE musteri_id = :musteri_id
               AND islem_turu = 'tahsilat'
+              AND onayli = 1
         ");
         $stmtTahsilat->execute([':musteri_id' => $musteri_id]);
         $tahsilatlar = $stmtTahsilat->fetchColumn();
         
-        // ÖDEMELER
-        $stmtOdeme = $pdo->prepare("
+        // TEDİYELER
+        $stmtTediye = $pdo->prepare("
             SELECT COALESCE(SUM(tutar), 0) AS toplam
-                FROM odeme_tahsilat
+            FROM odeme_tahsilat
             WHERE musteri_id = :musteri_id
-              AND islem_turu = 'odeme'
-            ");
-        $stmtOdeme->execute([':musteri_id' => $musteri_id]);
-        $odemeler = $stmtOdeme->fetchColumn();
+              AND islem_turu = 'tediye'
+              AND onayli = 1
+        ");
+        $stmtTediye->execute([':musteri_id' => $musteri_id]);
+        $tediyeler = $stmtTediye->fetchColumn();
         
         // Cari Bakiye Hesaplama:
-        // Borçlar (Bakiyeyi artıran): Satışlar + Ödemeler
-        // Alacaklar (Bakiyeyi azaltan): Alışlar + Tahsilatlar 
-        $cariBakiye = $satislar + $odemeler - $alislar - $tahsilatlar;
-        
-        return $cariBakiye;
+        // Pozitif bakiye: Müşteri bize borçlu
+        // Negatif bakiye: Biz müşteriye borçluyuz
+        // Satış: Müşteriyi borçlandırır (+)
+        // Alış: Biz borçlanırız (-)
+        // Tahsilat: Müşteri borcunu öder (-)
+        // Tediye: Biz borcumuzu öderiz (+)
+        return $satislar - $alislar - $tahsilatlar + $tediyeler;
     }
 }
 

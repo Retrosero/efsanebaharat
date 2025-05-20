@@ -95,7 +95,10 @@ try {
                 $stmtSatis = $pdo->prepare("
                     SELECT COALESCE(SUM(toplam_tutar), 0) as toplam_satis 
                     FROM faturalar 
-                    WHERE musteri_id = :mid AND fatura_turu = 'satis' AND para_birimi = 'TRY'
+                    WHERE musteri_id = :mid 
+                      AND fatura_turu = 'satis' 
+                      AND para_birimi = 'TRY'
+                      AND iptal = 0
                 ");
                 $stmtSatis->execute([':mid' => $m['id']]);
                 $toplam_satis = $stmtSatis->fetchColumn();
@@ -104,7 +107,10 @@ try {
                 $stmtAlis = $pdo->prepare("
                     SELECT COALESCE(SUM(toplam_tutar), 0) as toplam_alis 
                     FROM faturalar 
-                    WHERE musteri_id = :mid AND fatura_turu = 'alis' AND para_birimi = 'TRY'
+                    WHERE musteri_id = :mid 
+                      AND fatura_turu = 'alis' 
+                      AND para_birimi = 'TRY'
+                      AND iptal = 0
                 ");
                 $stmtAlis->execute([':mid' => $m['id']]);
                 $toplam_alis = $stmtAlis->fetchColumn();
@@ -114,12 +120,25 @@ try {
                     SELECT COALESCE(SUM(tutar), 0) as toplam_tahsilat 
                     FROM odeme_tahsilat 
                     WHERE musteri_id = :mid
+                      AND islem_turu = 'tahsilat'
+                      AND onayli = 1
                 ");
                 $stmtTahsilat->execute([':mid' => $m['id']]);
                 $toplam_tahsilat = $stmtTahsilat->fetchColumn();
 
-                // Gerçek bakiyeyi hesapla (satışlar - alışlar - tahsilatlar)
-                $m['gercek_bakiye'] = $toplam_satis - $toplam_alis - $toplam_tahsilat;
+                // Tediyeleri hesapla (odeme_tahsilat tablosundan)
+                $stmtTediye = $pdo->prepare("
+                    SELECT COALESCE(SUM(tutar), 0) as toplam_tediye 
+                    FROM odeme_tahsilat 
+                    WHERE musteri_id = :mid
+                      AND islem_turu = 'tediye'
+                      AND onayli = 1
+                ");
+                $stmtTediye->execute([':mid' => $m['id']]);
+                $toplam_tediye = $stmtTediye->fetchColumn();
+
+                // Gerçek bakiyeyi hesapla (satışlar - alışlar - tahsilatlar + tediyeler)
+                $m['gercek_bakiye'] = $toplam_satis - $toplam_alis - $toplam_tahsilat + $toplam_tediye;
                 
                 // Döviz bakiyelerini de ayrı hesapla
                 // USD Bakiye
