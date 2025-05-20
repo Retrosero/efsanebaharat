@@ -361,16 +361,185 @@ if ($modal_mode) {
     }
   </script>
   <style>
-    @media print {
-            .print\:hidden, .no-print, button, .button, input, select, .actions, .action-buttons {
-        display: none !important;
-      }
-            body {
-                background-color: white !important;
-            }
-            .print-only {
-                display: block !important;
-      }
+    @page { 
+      size: A4; 
+      margin: 10mm 8mm;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-size: 12px; /* Yazı boyutunu 12px yaptım */
+    }
+    
+    body { 
+      margin: 0; 
+      padding: 0;
+      font-family: 'Arial', 'Helvetica', sans-serif;
+      background-color: white;
+      color: #333;
+      line-height: 1.3; /* Satır aralığını azalttım */
+    }
+    
+    .invoice-container {
+      max-width: 210mm;
+      border: none !important;
+      box-shadow: none !important;
+      margin: 0 auto;
+      padding: 0;
+    }
+    
+    .header {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      padding: 0.5rem; /* Padding'i azalttım */
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 0.5rem; /* Margin'i azalttım */
+    }
+    
+    .header-left {
+      margin-bottom: 0.5rem;
+    }
+    
+    .header-right {
+      text-align: right;
+    }
+    
+    .company-name {
+      font-size: 14px; /* Şirket adı biraz daha büyük */
+      font-weight: bold;
+      color: #3176FF;
+    }
+    
+    .company-slogan {
+      color: #6b7280;
+      margin-top: 0.15rem;
+    }
+    
+    .invoice-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .invoice-number {
+      color: #666666;
+      margin-top: 0.15rem;
+    }
+    
+    .invoice-date {
+      color: #6b7280;
+      margin-top: 0.15rem;
+    }
+    
+    .info-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem; /* Gap'i azalttım */
+      padding: 0.5rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .info-title {
+      color: #4b5563;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+    
+    .customer-name {
+      font-weight: 600;
+      color: #111827;
+    }
+    
+    .customer-info {
+      color: #4b5563;
+    }
+    
+    .product-table {
+      padding: 0.5rem;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0.5rem;
+    }
+    
+    th {
+      padding: 0.35rem 0.5rem; /* Padding'i azalttım */
+      background-color: #f9fafb;
+      font-weight: 600;
+      text-align: left;
+      text-transform: uppercase;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    td {
+      padding: 0.35rem 0.5rem; /* Padding'i azalttım */
+      border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .totals-section {
+      background-color: #f9fafb;
+      padding: 0.5rem;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: flex-end; /* Sağa yasla */
+    }
+    
+    .totals-container {
+      width: 200px; /* Sabit genişlik */
+    }
+    
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.25rem 0;
+      font-size: 12px; /* Yazı boyutunu 12px yaptım */
+    }
+    
+    .total-row.grand-total {
+      border-top: 1px solid #e5e7eb;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      font-weight: 600;
+    }
+    
+    .total-row.grand-total .total-label {
+      font-weight: 600;
+    }
+    
+    .total-row.grand-total .total-value {
+      color: #3176FF;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    
+    .customer-balance-section {
+      padding: 0.5rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .balance-title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .balance-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.15rem 0;
+    }
+    
+    .balance-negative {
+      color: #dc2626;
+    }
+    
+    .balance-positive {
+      color: #047857;
     }
   </style>
 </head>
@@ -381,7 +550,17 @@ if ($modal_mode) {
 <div class="w-full">
     <!-- Butonlar -->  <div class="flex justify-between items-center mb-6 print:hidden">    <div class="flex space-x-2">      <button         id="backButton"        onclick="history.back()"         class="flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"      >        <i class="ri-arrow-left-line mr-2"></i> Geri      </button>    </div>        <div class="flex space-x-2">      <!-- Düzenle Butonu -->      <a         href="fatura_duzenle.php?id=<?= $fatura_id ?>"         class="flex items-center px-4 py-2 bg-blue-50 text-primary hover:bg-blue-100 rounded-button text-sm"      >        <i class="ri-edit-line mr-2"></i> Düzenle      </a>            <!-- Sil Butonu -->      <button         type="button"        id="deleteButton"        class="flex items-center px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-button text-sm"      >        <i class="ri-delete-bin-line mr-2"></i> Sil      </button>            <!-- Yazdır Butonu - iyileştirilmiş -->      <button         id="printButton"        class="flex items-center px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-button text-sm"      >        <i class="ri-printer-line mr-2"></i> Yazdır      </button>            <!-- Dışa Aktar Butonu -->      <div class="relative">        <button           id="exportBtn"          class="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"        >          <i class="ri-download-line mr-2"></i> Dışa Aktar        </button>        <div id="exportMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-10 border border-gray-200">          <a href="#" onclick="exportAs('pdf')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF olarak indir</a>          <a href="#" onclick="exportAs('xlsx')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel olarak indir</a>          <a href="#" onclick="exportAs('png')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Görüntü olarak indir</a>        </div>      </div>    </div>  </div>
 
-    <!-- İçerik -->  <div class="bg-white border border-gray-200 rounded shadow-sm mx-4 mb-4" id="invoiceContainer">    <!-- Fatura Başlık Alanı -->    <div class="p-6 flex flex-col sm:flex-row justify-between border-b">      <!-- Sol taraf - Firma/Uygulama Bilgisi -->      <div class="mb-4 sm:mb-0">        <h1 class="text-2xl font-bold text-primary">Efsane Baharat</h1>        <p class="text-gray-500 mt-1">Baharatlar & Kuruyemişler</p>      </div>            <!-- Sağ taraf - Fatura Bilgisi -->      <div class="text-right">        <h2 class="text-xl font-semibold"><?= $faturaTuruBaslik ?></h2>        <p class="text-secondary mt-1">Fatura No: <span class="font-medium">#<?= htmlspecialchars($faturaNo) ?></span></p>        <p class="text-gray-500 mt-1">Tarih: <?= date('d.m.Y', strtotime($fatura['fatura_tarihi'])) ?></p>      </div>    </div>        <!-- Gönderen ve Alıcı Bilgileri -->    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b">      <!-- Gönderen/Alıcı Bilgisi -->      <div>      </div>            <!-- Müşteri/Tedarikçi Bilgisi -->      <div>        <h3 class="font-medium text-gray-700 mb-2"><?= $firmaEtiketi ?> Bilgileri</h3>        <p class="text-gray-900 font-semibold"><?= htmlspecialchars($fatura['firma_ad'] . ' ' . $fatura['firma_soyad']) ?></p>        <?php if (!empty($fatura['adres'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['adres']) ?></p>        <?php endif; ?>        <?php if (!empty($fatura['telefon'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['telefon']) ?></p>        <?php endif; ?>        <?php if (!empty($fatura['email'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['email']) ?></p>        <?php endif; ?>      </div>    </div>        <?php if (!empty($orderNote)): ?>    <!-- Sipariş Notu -->    <div class="p-6 border-b">      <div class="bg-blue-50 p-4 rounded">        <h3 class="font-medium text-blue-800 mb-1">Sipariş Notu</h3>        <p class="text-blue-700"><?= nl2br(htmlspecialchars($orderNote)) ?></p>      </div>    </div>    <?php endif; ?>    <!-- Ürün Tablosu -->    <div class="p-6">      <!-- Arama Bölümü -->      <div class="relative mb-4 print:hidden">        <input           id="searchInput"          type="search"          placeholder="Ürün ara..."          class="w-full h-9 pl-9 pr-3 rounded bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-primary"        />        <i class="ri-search-line absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>      </div>            <!-- Tablo -->      <div class="overflow-x-auto">        <table class="min-w-full">          <thead>            <tr class="border-b-2 border-gray-200">              <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">#</th>              <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ürün</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Miktar</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Birim Fiyat</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Toplam</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">İskonto</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Net Tutar</th>            </tr>          </thead>          <tbody>            <?php             $genel_toplam = 0;            $genel_iskonto = 0;            $sira = 1;            foreach ($detaylar as $d):                 $genel_toplam += $d['toplam_fiyat'];                $genel_iskonto += $d['indirim_tutari'];            ?>              <tr class="border-b border-gray-100 hover:bg-gray-50">                <td class="py-3 px-4 text-sm"><?= $sira++ ?></td>                <td class="py-3 px-4 text-sm">                  <?= htmlspecialchars($d['name']) ?>                  <?php if (!empty($d['urun_notu'])): ?>                    <div class="text-xs text-blue-600 mt-1"><?= htmlspecialchars($d['urun_notu']) ?></div>                  <?php endif; ?>                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['miktar'], 3, ',', '.') ?> <?= $d['olcum_birimi'] ?>                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['birim_fiyat'], 2, ',', '.') ?> ₺                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['toplam_fiyat'], 2, ',', '.') ?> ₺                </td>                <td class="py-3 px-4 text-sm text-right">                  <?php if ($d['indirim_tutari'] > 0): ?>                    <span class="text-red-600">                      -%<?= number_format($d['indirim_orani'], 2, ',', '.') ?>                      (<?= number_format($d['indirim_tutari'], 2, ',', '.') ?> ₺)                    </span>                  <?php else: ?>                    -                  <?php endif; ?>                </td>                <td class="py-3 px-4 text-sm text-right font-medium">                  <?= number_format($d['net_tutar'], 2, ',', '.') ?> ₺                </td>              </tr>            <?php endforeach; ?>          </tbody>        </table>      </div>    </div>        <!-- Toplam Kısmı -->    <div class="p-6 border-t bg-gray-50">      <div class="flex justify-end">        <div class="w-full sm:w-1/2 md:w-1/3 lg:w-1/4">          <div class="flex justify-between py-2">            <span class="text-gray-600">Ara Toplam:</span>            <span class="font-medium"><?= number_format($genel_toplam, 2, ',', '.') ?> ₺</span>          </div>          <div class="flex justify-between py-2">            <span class="text-gray-600">İskonto:</span>            <span class="font-medium text-red-600">-<?= number_format($genel_iskonto, 2, ',', '.') ?> ₺</span>          </div>          <div class="flex justify-between py-3 border-t border-gray-300 mt-2">            <span class="text-gray-800 font-semibold">Genel Toplam:</span>            <span class="text-primary font-bold text-lg"><?= number_format($fatura['genel_toplam'], 2, ',', '.') ?> ₺</span>          </div>        </div>      </div>    </div>        <!-- Alt Bilgi -->    <div class="p-6 text-center text-gray-500 border-t">      <p class="mb-1">Bu bir bilgi faturasıdır. Yasal fatura değildir.</p>      <p>Efsane Baharat Ltd. Şti. &copy; <?= date('Y') ?></p>    </div>  </div></div>  <!-- Yazdırma için stil --><style type="text/css" media="print">  @page {    size: auto;    margin: 0mm;  }  body {    background-color: #ffffff !important;    padding: 20px !important;  }  .print\:hidden {    display: none !important;  }  #invoiceContainer {    box-shadow: none !important;    border: none !important;  }  .hide-on-print {    display: none !important;  }</style>
+    <!-- İçerik -->  <div class="bg-white border border-gray-200 rounded shadow-sm mx-4 mb-4" id="invoiceContainer">    <!-- Fatura Başlık Alanı -->    <div class="p-6 flex flex-col sm:flex-row justify-between border-b">      <!-- Sol taraf - Firma/Uygulama Bilgisi -->      <div class="mb-4 sm:mb-0">        <h1 class="text-2xl font-bold text-primary">Efsane Baharat</h1>        <p class="text-gray-500 mt-1">Baharatlar & Kuruyemişler</p>      </div>            <!-- Sağ taraf - Fatura Bilgisi -->      <div class="text-right">        <h2 class="text-xl font-semibold"><?= $faturaTuruBaslik ?></h2>        <p class="text-secondary mt-1">Fatura No: <span class="font-medium">#<?= htmlspecialchars($faturaNo) ?></span></p>        <p class="text-gray-500 mt-1">Tarih: <?= date('d.m.Y', strtotime($fatura['fatura_tarihi'])) ?></p>      </div>    </div>        <!-- Gönderen ve Alıcı Bilgileri -->    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b">      <!-- Gönderen/Alıcı Bilgisi -->      <div>      </div>            <!-- Müşteri/Tedarikçi Bilgisi -->      <div>        <h3 class="font-medium text-gray-700 mb-2"><?= $firmaEtiketi ?> Bilgileri</h3>        <p class="text-gray-900 font-semibold"><?= htmlspecialchars($fatura['firma_ad'] . ' ' . $fatura['firma_soyad']) ?></p>        <?php if (!empty($fatura['adres'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['adres']) ?></p>        <?php endif; ?>        <?php if (!empty($fatura['telefon'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['telefon']) ?></p>        <?php endif; ?>        <?php if (!empty($fatura['email'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['email']) ?></p>        <?php endif; ?>      </div>    </div>        <?php if (!empty($orderNote)): ?>    <!-- Sipariş Notu -->    <div class="p-6 border-b">      <div class="bg-blue-50 p-4 rounded">        <h3 class="font-medium text-blue-800 mb-1">Sipariş Notu</h3>        <p class="text-blue-700"><?= nl2br(htmlspecialchars($orderNote)) ?></p>      </div>    </div>    <?php endif; ?>    <!-- Ürün Tablosu -->    <div class="p-6">      <!-- Arama Bölümü -->      <div class="relative mb-4 print:hidden">        <input           id="searchInput"          type="search"          placeholder="Ürün ara..."          class="w-full h-9 pl-9 pr-3 rounded bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-primary"        />        <i class="ri-search-line absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>      </div>            <!-- Tablo -->      <div class="overflow-x-auto">        <table class="min-w-full">          <thead>            <tr class="border-b-2 border-gray-200">              <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">#</th>              <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ürün</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Miktar</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Birim Fiyat</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Toplam</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">İskonto</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Net Tutar</th>            </tr>          </thead>          <tbody>            <?php             $genel_toplam = 0;            $genel_iskonto = 0;            $sira = 1;            foreach ($detaylar as $d):                 $genel_toplam += $d['toplam_fiyat'];                $genel_iskonto += $d['indirim_tutari'];            ?>              <tr class="border-b border-gray-100 hover:bg-gray-50">                <td class="py-3 px-4 text-sm"><?= $sira++ ?></td>                <td class="py-3 px-4 text-sm">                  <?= htmlspecialchars($d['name']) ?>                  <?php if (!empty($d['urun_notu'])): ?>                    <div class="text-xs text-blue-600 mt-1"><?= htmlspecialchars($d['urun_notu']) ?></div>                  <?php endif; ?>                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['miktar'], 3, ',', '.') ?> <?= $d['olcum_birimi'] ?>                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['birim_fiyat'], 2, ',', '.') ?> ₺                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['toplam_fiyat'], 2, ',', '.') ?> ₺                </td>                <td class="py-3 px-4 text-sm text-right">                  <?php if ($d['indirim_tutari'] > 0): ?>                    <span class="text-red-600">                      -%<?= number_format($d['indirim_orani'], 2, ',', '.') ?>                      (<?= number_format($d['indirim_tutari'], 2, ',', '.') ?> ₺)                    </span>                  <?php else: ?>                    -                  <?php endif; ?>                </td>                <td class="py-3 px-4 text-sm text-right font-medium">                  <?= number_format($d['net_tutar'], 2, ',', '.') ?> ₺                </td>              </tr>            <?php endforeach; ?>          </tbody>        </table>      </div>    </div>        <!-- Toplam Kısmı -->    <div class="totals-section">      <div class="totals-container">        <div class="total-row">          <span class="total-label">Ara Toplam:</span>          <span class="total-value"><?= number_format($genel_toplam, 2, ',', '.') ?> ₺</span>        </div>        <?php if ($genel_iskonto > 0): ?>          <div class="total-row">            <span class="total-label">İskonto:</span>            <span class="total-value text-red-600">-<?= number_format($genel_iskonto, 2, ',', '.') ?> ₺</span>          </div>        <?php endif; ?>        <div class="total-row grand-total">          <span class="total-label">Genel Toplam:</span>          <span class="total-value"><?= number_format($fatura['genel_toplam'], 2, ',', '.') ?> ₺</span>        </div>      </div>    </div>    </div>        <!-- Alt Bilgi -->    <div class="p-6 text-center text-gray-500 border-t">      <p class="mb-1">Bu bir bilgi faturasıdır. Yasal fatura değildir.</p>      <p>Efsane Baharat Ltd. Şti. &copy; <?= date('Y') ?></p>    </div>  </div></div>  <!-- Yazdırma için stil --><style type="text/css" media="print">  @page {    size: auto;    margin: 0mm;  }  body {    background-color: #ffffff !important;    padding: 20px !important;  }  .print\:hidden, .no-print, button, .button, input, select, .actions, .action-buttons {
+        display: none !important;
+      }
+            body {
+                background-color: white !important;
+            }
+            .print-only {
+                display: block !important;
+      }
+    }
+  </style>
 
 <!-- Silme Onay Modalı -->
 <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -608,13 +787,14 @@ if ($modal_mode) {
         <style>
           @page { 
             size: A4; 
-            margin: 15mm 10mm;
+            margin: 10mm 8mm; /* Kenar boşluklarını azalttım */
           }
           
           * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            font-size: 11px; /* Tüm yazı boyutlarını 11px yaptım */
           }
           
           body { 
@@ -623,7 +803,7 @@ if ($modal_mode) {
             font-family: 'Arial', 'Helvetica', sans-serif;
             background-color: white;
             color: #333;
-            line-height: 1.5;
+            line-height: 1.3; /* Satır aralığını azalttım */
           }
           
           .invoice-container {
@@ -638,13 +818,13 @@ if ($modal_mode) {
             display: flex;
             flex-direction: row;
             justify-content: space-between;
-            padding: 1rem;
+            padding: 0.5rem; /* Padding'i azalttım */
             border-bottom: 1px solid #e5e7eb;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem; /* Margin'i azalttım */
           }
           
           .header-left {
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
           }
           
           .header-right {
@@ -652,44 +832,44 @@ if ($modal_mode) {
           }
           
           .company-name {
-            font-size: 1.5rem;
+            font-size: 14px; /* Şirket adı biraz daha büyük */
             font-weight: bold;
             color: #3176FF;
           }
           
           .company-slogan {
             color: #6b7280;
-            margin-top: 0.25rem;
+            margin-top: 0.15rem;
           }
           
           .invoice-title {
-            font-size: 1.25rem;
+            font-size: 13px;
             font-weight: 600;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
           }
           
           .invoice-number {
             color: #666666;
-            margin-top: 0.25rem;
+            margin-top: 0.15rem;
           }
           
           .invoice-date {
             color: #6b7280;
-            margin-top: 0.25rem;
+            margin-top: 0.15rem;
           }
           
           .info-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            padding: 1rem;
+            gap: 1rem; /* Gap'i azalttım */
+            padding: 0.5rem;
             border-bottom: 1px solid #e5e7eb;
           }
           
           .info-title {
             color: #4b5563;
             font-weight: 500;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
           }
           
           .customer-name {
@@ -702,92 +882,87 @@ if ($modal_mode) {
           }
           
           .product-table {
-            padding: 1rem;
+            padding: 0.5rem;
           }
           
           table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
           }
           
           th {
-            padding: 0.75rem 1rem;
+            padding: 0.35rem 0.5rem; /* Padding'i azalttım */
             background-color: #f9fafb;
             font-weight: 600;
             text-align: left;
-            font-size: 0.75rem;
             text-transform: uppercase;
             color: #6b7280;
-            border-bottom: 2px solid #e5e7eb;
-          }
-          
-          th.text-right {
-            text-align: right;
+            border-bottom: 1px solid #e5e7eb;
           }
           
           td {
-            padding: 0.75rem 1rem;
+            padding: 0.35rem 0.5rem; /* Padding'i azalttım */
             border-bottom: 1px solid #f3f4f6;
-            font-size: 0.875rem;
-          }
-          
-          td.text-right {
-            text-align: right;
           }
           
           .totals-section {
             background-color: #f9fafb;
-            padding: 1rem;
+            padding: 0.5rem;
             border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: flex-end; /* Sağa yasla */
           }
           
           .totals-container {
-            display: flex;
-            justify-content: flex-end;
-          }
-          
-          .totals-table {
-            width: 100%;
-            max-width: 250px;
+            width: 200px; /* Sabit genişlik */
           }
           
           .total-row {
             display: flex;
             justify-content: space-between;
-            padding: 0.5rem 0;
+            padding: 0.25rem 0;
+            font-size: 12px; /* Yazı boyutunu 12px yaptım */
           }
           
-          .grand-total {
+          .total-row.grand-total {
             border-top: 1px solid #e5e7eb;
             margin-top: 0.5rem;
             padding-top: 0.5rem;
             font-weight: 600;
           }
           
-          .grand-total-value {
-            color: #3176FF;
-            font-weight: bold;
-            font-size: 1.125rem;
+          .total-row.grand-total .total-label {
+            font-weight: 600;
           }
           
-          .footer {
-            padding: 1rem;
-            text-align: center;
-            color: #6b7280;
+          .total-row.grand-total .total-value {
+            color: #3176FF;
+            font-weight: bold;
+            font-size: 13px;
+          }
+          
+          .customer-balance-section {
+            padding: 0.5rem;
             border-top: 1px solid #e5e7eb;
           }
           
-          .customer-balance {
-            font-weight: bold;
-            margin-top: 0.5rem;
+          .balance-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
           }
           
-          .negative-balance {
+          .balance-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.15rem 0;
+          }
+          
+          .balance-negative {
             color: #dc2626;
           }
           
-          .positive-balance {
+          .balance-positive {
             color: #047857;
           }
           
@@ -802,8 +977,8 @@ if ($modal_mode) {
               <div class="company-slogan">Baharatlar & Kuruyemişler</div>
             </div>
             <div class="header-right">
-              <div class="invoice-title"><?= $faturaTuruBaslik ?></div>
-              <div class="invoice-number">Fatura No: <span class="font-medium">#<?= htmlspecialchars($faturaNo) ?></span></div>
+              <div class="invoice-title">Teklif Fişi</div>
+              <div class="invoice-number">Fiş No: <span class="font-medium">#<?= htmlspecialchars($faturaNo) ?></span></div>
               <div class="invoice-date">Tarih: <?= date('d.m.Y', strtotime($fatura['fatura_tarihi'])) ?></div>
             </div>
           </div>
@@ -882,29 +1057,71 @@ if ($modal_mode) {
           <!-- Toplam Kısmı -->
           <div class="totals-section">
             <div class="totals-container">
-              <div class="totals-table">
-                <div class="total-row">
-                  <span>Ara Toplam:</span>
-                  <span><?= number_format($genel_toplam, 2, ',', '.') ?> ₺</span>
-                </div>
-                <div class="total-row">
-                  <span>İskonto:</span>
-                  <span style="color: #dc2626;">-<?= number_format($genel_iskonto, 2, ',', '.') ?> ₺</span>
-                </div>
-                <div class="total-row grand-total">
-                  <span>Genel Toplam:</span>
-                  <span class="grand-total-value"><?= number_format($fatura['genel_toplam'], 2, ',', '.') ?> ₺</span>
-                </div>
+              <div class="total-row">
+                <span class="total-label">Ara Toplam:</span>
+                <span class="total-value"><?= number_format($genel_toplam, 2, ',', '.') ?> ₺</span>
+              </div>
+              <?php if ($genel_iskonto > 0): ?>
+              <div class="total-row">
+                <span class="total-label">İskonto:</span>
+                <span class="total-value text-red-600">-<?= number_format($genel_iskonto, 2, ',', '.') ?> ₺</span>
+              </div>
+              <?php endif; ?>
+              <div class="total-row grand-total">
+                <span class="total-label">Genel Toplam:</span>
+                <span class="total-value"><?= number_format($fatura['genel_toplam'], 2, ',', '.') ?> ₺</span>
               </div>
             </div>
           </div>
           
           <!-- Alt Bilgi - Müşteri Bakiyesi -->
-          <div class="footer">
-            <?php if ($fatura['fatura_turu'] == 'satis' && isset($fatura['cari_bakiye'])): ?>
-              <div class="customer-balance <?= $fatura['cari_bakiye'] < 0 ? 'negative-balance' : 'positive-balance' ?>">
-                Müşteri Önceki Bakiyesi: <?= number_format($fatura['cari_bakiye'], 2, ',', '.') ?> ₺
+          <div class="customer-balance-section">
+            <?php if ($fatura['fatura_turu'] == 'satis'): ?>
+              <div class="balance-title">Müşteri Bakiye Durumu:</div>
+              
+              <!-- TRY Bakiyesi -->
+              <?php if (isset($fatura['try_bakiye'])): ?>
+              <div class="balance-row">
+                <span>TRY Bakiye:</span>
+                <span class="<?= $fatura['try_bakiye'] > 0 ? 'balance-negative' : 'balance-positive' ?>">
+                  <?= number_format(abs($fatura['try_bakiye']), 2, ',', '.') ?> ₺
+                  <?= $fatura['try_bakiye'] > 0 ? '(Borçlu)' : ($fatura['try_bakiye'] < 0 ? '(Alacaklı)' : '') ?>
+                </span>
               </div>
+              <?php endif; ?>
+              
+              <!-- USD Bakiyesi -->
+              <?php if (isset($fatura['usd_bakiye']) && $fatura['usd_bakiye'] != 0): ?>
+              <div class="balance-row">
+                <span>USD Bakiye:</span>
+                <span class="<?= $fatura['usd_bakiye'] > 0 ? 'balance-negative' : 'balance-positive' ?>">
+                  <?= number_format(abs($fatura['usd_bakiye']), 2, ',', '.') ?> $
+                  <?= $fatura['usd_bakiye'] > 0 ? '(Borçlu)' : ($fatura['usd_bakiye'] < 0 ? '(Alacaklı)' : '') ?>
+                </span>
+              </div>
+              <?php endif; ?>
+              
+              <!-- EUR Bakiyesi -->
+              <?php if (isset($fatura['eur_bakiye']) && $fatura['eur_bakiye'] != 0): ?>
+              <div class="balance-row">
+                <span>EUR Bakiye:</span>
+                <span class="<?= $fatura['eur_bakiye'] > 0 ? 'balance-negative' : 'balance-positive' ?>">
+                  <?= number_format(abs($fatura['eur_bakiye']), 2, ',', '.') ?> €
+                  <?= $fatura['eur_bakiye'] > 0 ? '(Borçlu)' : ($fatura['eur_bakiye'] < 0 ? '(Alacaklı)' : '') ?>
+                </span>
+              </div>
+              <?php endif; ?>
+              
+              <!-- GBP Bakiyesi -->
+              <?php if (isset($fatura['gbp_bakiye']) && $fatura['gbp_bakiye'] != 0): ?>
+              <div class="balance-row">
+                <span>GBP Bakiye:</span>
+                <span class="<?= $fatura['gbp_bakiye'] > 0 ? 'balance-negative' : 'balance-positive' ?>">
+                  <?= number_format(abs($fatura['gbp_bakiye']), 2, ',', '.') ?> £
+                  <?= $fatura['gbp_bakiye'] > 0 ? '(Borçlu)' : ($fatura['gbp_bakiye'] < 0 ? '(Alacaklı)' : '') ?>
+                </span>
+              </div>
+              <?php endif; ?>
             <?php endif; ?>
           </div>
         </div>

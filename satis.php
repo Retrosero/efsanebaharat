@@ -525,6 +525,32 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
     </div>
 </div>
 
+<!-- Fatura Yazdırma Modal -->
+<div id="printInvoiceModal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-lg shadow-xl">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-medium">Fatura Yazdırma</h3>
+        <button onclick="closePrintInvoiceModal()" class="p-2 hover:bg-gray-100 rounded-full">
+          <i class="ri-close-line ri-lg"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <p class="text-gray-600">Fatura başarıyla oluşturuldu. Yazdırmak ister misiniz?</p>
+        <div class="flex justify-end gap-4">
+          <button onclick="closePrintInvoiceModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-button">
+            Kapat
+          </button>
+          <button onclick="printInvoice()" class="px-4 py-2 bg-primary text-white text-sm rounded-button flex items-center gap-2">
+            <i class="ri-printer-line"></i>
+            Yazdır
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
 /* Görünüm butonları için stil */
 .view-btn {
@@ -766,7 +792,7 @@ let showOutOfStock = false;
 let minPrice = 0;
 let maxPrice = Infinity;
 
-// --- localStorage Functions ---
+// ... localStorage Functions ...
 function saveCartToLocalStorage() {
     localStorage.setItem('shoppingCartSatis', JSON.stringify(cart));
 }
@@ -832,7 +858,7 @@ function loadFilterStateFromLocalStorage() {
         document.getElementById('maxPrice').value = maxPrice < Infinity ? maxPrice : '';
     }
 }
-// --- End localStorage Functions ---
+// ... End localStorage Functions ...
 
 // Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', function() {
@@ -2054,9 +2080,9 @@ function completeOrder(){
   .then(resp=>{
     console.log('Sunucu yanıtı:', resp);
     if(resp.success){
-      alert("Sipariş başarıyla kaydedildi! Fatura No: " + resp.fatura_id);
+      // Sepeti temizle
       cart=[];
-      updateCartCount(); // Saves empty cart
+      updateCartCount();
       
       document.getElementById('orderNote').value='';
       localStorage.removeItem('orderNoteSatis');
@@ -2064,7 +2090,10 @@ function completeOrder(){
       document.getElementById('discountRate').value = '';
       localStorage.removeItem('discountRateSatis');
       
-      renderCart(); // Renders empty cart & recalculates totals
+      renderCart();
+
+      // Fatura yazdırma modalını göster
+      showPrintInvoiceModal(resp.fatura_id);
     } else {
       console.error('Sipariş hatası:', resp);
       alert("Sipariş kaydedilirken hata: "+(resp.message||'Bilinmeyen hata'));
@@ -2656,6 +2685,49 @@ function clearSelectedCustomer() {
   
   // Arama kutusunu temizle
   document.getElementById('customerSearchDropdown').value = '';
+}
+
+let currentInvoiceId = null; // Global değişken olarak fatura ID'sini tutacağız
+
+function showPrintInvoiceModal(faturaId) {
+  currentInvoiceId = faturaId;
+  const modal = document.getElementById('printInvoiceModal');
+  modal.classList.remove('hidden');
+}
+
+function closePrintInvoiceModal() {
+  const modal = document.getElementById('printInvoiceModal');
+  modal.classList.add('hidden');
+  currentInvoiceId = null;
+}
+
+function printInvoice() {
+  if (!currentInvoiceId) return;
+  
+  // Yazdırma sayfasını iframe içinde aç ve yazdır
+  const printFrame = document.createElement('iframe');
+  printFrame.style.display = 'none';
+  document.body.appendChild(printFrame);
+  
+  printFrame.src = `fatura_detay.php?id=${currentInvoiceId}&print=1`;
+  
+  // Iframe yüklendikten sonra yazdır
+  printFrame.onload = function() {
+    try {
+      printFrame.contentWindow.print();
+      
+      // Yazdırma işlemi tamamlandıktan sonra iframe'i kaldır
+      setTimeout(() => {
+        document.body.removeChild(printFrame);
+      }, 1000);
+    } catch (e) {
+      console.error('Yazdırma hatası:', e);
+      // Hata durumunda normal sayfaya yönlendir
+      window.open(`fatura_detay.php?id=${currentInvoiceId}`, '_blank');
+    }
+  };
+  
+  closePrintInvoiceModal();
 }
 </script>
 
