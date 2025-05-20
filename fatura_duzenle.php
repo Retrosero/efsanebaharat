@@ -134,9 +134,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Yeni detayları ekle ve stokları güncelle
         $stmtIns = $pdo->prepare("
             INSERT INTO fatura_detaylari (
-                fatura_id, urun_id, miktar, birim_fiyat, created_at
+                fatura_id, urun_id, miktar, birim_fiyat
             ) VALUES (
-                :fatura_id, :urun_id, :miktar, :birim_fiyat, NOW()
+                :fatura_id, :urun_id, :miktar, :birim_fiyat
             )
         ");
 
