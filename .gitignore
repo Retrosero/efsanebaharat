@@ -1,0 +1,36 @@
+# Büyük yedek dosyaları
+yedek/backup-4.30.2025_16-07-36_efsaneba.tar.gz
+yedek/*.tar.gz
+yedek/*.gz
+yedek/*.zip
+yedek/*.rar
+
+# Sistem dosyaları
+.DS_Store
+Thumbs.db
+
+# Geçici dosyalar
+*.tmp
+*.log
+*.bak
+
+# IDE ve editör dosyaları
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# PHP ve web geliştirici dosyaları
+/vendor/
+/node_modules/
+composer.lock
+npm-debug.log
+yarn-error.log
+
+# Konfigürasyon dosyaları (gerekirse)
+#config.php
+
+# Yedek dosyaları
+*.backup
+*.bak
+*.old 

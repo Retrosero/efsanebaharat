@@ -97,14 +97,15 @@ function getMusteriCariBakiye($pdo, $musteri_id){
 
     return $toplamSatis - $toplamTahsilat;
 }
-$cariBakiye = getMusteriCariBakiye($pdo, $musteri['id']);
+$cariBakiye = hesaplaGuncelBakiye($pdo, $musteri['id']);
 $cariBakiyeFormatted = number_format($cariBakiye, 2, ',', '.');
 
 // Ciro bilgisi için fonksiyonlar
 function getMusteriCiroYillik($pdo, $musteri_id, $yil) {
-    // Satış, iade ve net değerlerini tutacak dizi
+    // Satış, alış, iade ve net değerlerini tutacak dizi
     $sonuclar = [
         'satis' => 0,
+        'alis' => 0,
         'iade' => 0,
         'net' => 0
     ];
@@ -126,6 +127,23 @@ function getMusteriCiroYillik($pdo, $musteri_id, $yil) {
     
     $sonuclar['satis'] = $stmtSatis->fetchColumn();
     
+    // Alış faturaları toplamını hesapla
+    $stmtAlis = $pdo->prepare("
+        SELECT COALESCE(SUM(toplam_tutar), 0) as toplam
+        FROM faturalar
+        WHERE musteri_id = :musteri_id
+        AND YEAR(fatura_tarihi) = :yil
+        AND fatura_turu = 'alis'
+        AND iptal = 0
+    ");
+    
+    $stmtAlis->execute([
+        ':musteri_id' => $musteri_id,
+        ':yil' => $yil
+    ]);
+    
+    $sonuclar['alis'] = $stmtAlis->fetchColumn();
+    
     // İade faturaları toplamını hesapla (iade faturalarını temsil eden bir alan varsa)
     $stmtIade = $pdo->prepare("
         SELECT COALESCE(SUM(toplam_tutar), 0) as toplam
@@ -143,8 +161,8 @@ function getMusteriCiroYillik($pdo, $musteri_id, $yil) {
     
     $sonuclar['iade'] = $stmtIade->fetchColumn();
     
-    // Net değeri hesapla
-    $sonuclar['net'] = $sonuclar['satis'] - $sonuclar['iade'];
+    // Net değeri hesapla (Satış - İade - Alış)
+    $sonuclar['net'] = $sonuclar['satis'] - $sonuclar['iade'] - $sonuclar['alis'];
     
     return $sonuclar;
 }
@@ -242,6 +260,20 @@ try {
 
       UNION
 
+      SELECT 
+        f.id AS rec_id,
+        f.toplam_tutar AS tutar,
+        'Alış' AS odeme_yontemi,
+        f.aciklama,
+        f.fatura_tarihi AS islem_tarihi,
+        f.created_at,
+        'Alis' AS tur
+      FROM faturalar f
+      WHERE f.fatura_turu='alis'
+        AND f.musteri_id=:mid3
+
+      UNION
+
       SELECT
         o.id AS rec_id,
         o.tutar AS tutar,
@@ -263,7 +295,7 @@ try {
       ORDER BY islem_tarihi DESC, rec_id DESC
     ";
     $stmtU = $pdo->prepare($sqlUnion);
-    $stmtU->execute([':mid'=>$musteri['id'], ':mid2'=>$musteri['id']]);
+    $stmtU->execute([':mid'=>$musteri['id'], ':mid2'=>$musteri['id'], ':mid3'=>$musteri['id']]);
     $hesapHareketleri = $stmtU->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e){
     error_log("Hesap hareketleri çekilirken hata: " . $e->getMessage());
@@ -348,7 +380,7 @@ try {
         <div class="text-xl sm:text-2xl font-bold text-primary">
           ₺<?= $cariBakiyeFormatted ?>
         </div>
-        <p class="text-xs sm:text-sm text-gray-600">Satış - Tahsilat ile hesaplanır</p>
+        <p class="text-xs sm:text-sm text-gray-600">Satış - Alış - Tahsilat ile hesaplanır</p>
       </div>
       
       <!-- Ciro Bilgisi (Yeni Eklenen) -->
@@ -358,6 +390,10 @@ try {
           <div class="flex justify-between items-center">
             <span class="text-sm"><?= $buYil ?> Satış:</span>
             <span class="font-medium">₺<?= number_format(isset($buYilCiro['satis']) ? $buYilCiro['satis'] : 0, 2, ',', '.') ?></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-sm"><?= $buYil ?> Alış:</span>
+            <span class="font-medium text-blue-500">₺<?= number_format(isset($buYilCiro['alis']) ? $buYilCiro['alis'] : 0, 2, ',', '.') ?></span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm"><?= $buYil ?> İade:</span>
@@ -385,19 +421,21 @@ try {
     </div>
 
     <!-- Sekmeler Başlıkları -->
-    <div class="flex flex-wrap space-x-2 sm:space-x-6 border-b mb-4 sm:mb-6 overflow-x-auto pb-1">
-      <button class="tab-btn tab-active px-3 py-2 text-sm sm:text-base whitespace-nowrap" data-tab="siparisler">
+    <div class="flex border-b mb-4 sm:mb-6 overflow-x-auto pb-1 no-scrollbar">
+      <div class="flex space-x-1 sm:space-x-2 w-full">
+        <button class="tab-btn tab-active px-3 py-2 text-sm sm:text-base whitespace-nowrap flex-shrink-0" data-tab="siparisler">
         Sipariş Geçmişi
       </button>
-      <button class="tab-btn px-3 py-2 text-sm sm:text-base whitespace-nowrap" data-tab="hareketler">
+        <button class="tab-btn px-3 py-2 text-sm sm:text-base whitespace-nowrap flex-shrink-0" data-tab="hareketler">
         Hesap Hareketleri
       </button>
-      <button class="tab-btn px-3 py-2 text-sm sm:text-base whitespace-nowrap" data-tab="urunler">
+        <button class="tab-btn px-3 py-2 text-sm sm:text-base whitespace-nowrap flex-shrink-0" data-tab="urunler">
         Satın Alınan Ürünler
       </button>
-      <button class="tab-btn px-3 py-2 text-sm sm:text-base whitespace-nowrap" data-tab="duzenle">
+        <button class="tab-btn px-3 py-2 text-sm sm:text-base whitespace-nowrap flex-shrink-0" data-tab="duzenle">
         Düzenle
       </button>
+      </div>
     </div>
 
     <!-- 1) Sipariş Geçmişi (Gerçek Faturalar) -->
@@ -526,10 +564,11 @@ try {
             <?php 
               $islemTarihi = date('d.m.Y', strtotime($hareket['islem_tarihi']));
               $tutarFormatted = number_format($hareket['tutar'], 2, ',', '.');
-              $islemTuru = $hareket['tur'] === 'Satis' ? 'Satış' : 'Tahsilat';
-              $tutarClass = $hareket['tur'] === 'Satis' ? 'text-red-600' : 'text-green-600';
+              $islemTuru = $hareket['tur'] === 'Satis' ? 'Satış' : ($hareket['tur'] === 'Alis' ? 'Alış' : 'Tahsilat');
+              $tutarClass = $hareket['tur'] === 'Satis' ? 'text-red-600' : ($hareket['tur'] === 'Alis' ? 'text-green-600' : 'text-green-600');
               $tutarPrefix = $hareket['tur'] === 'Satis' ? '-' : '+';
-              $detayUrl = $hareket['tur'] === 'Satis' ? "fatura_detay.php?id={$hareket['rec_id']}" : "tahsilat_detay.php?id={$hareket['rec_id']}";
+              $detayUrl = $hareket['tur'] === 'Satis' ? "fatura_detay.php?id={$hareket['rec_id']}" : 
+                         ($hareket['tur'] === 'Alis' ? "fatura_detay.php?id={$hareket['rec_id']}" : "tahsilat_detay.php?id={$hareket['rec_id']}");
             ?>
             <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='<?= $detayUrl ?>'">
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= $islemTarihi ?></td>
@@ -893,6 +932,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // Sekmeler
   const tabBtns=document.querySelectorAll('.tab-btn');
   const tabContents=document.querySelectorAll('.tab-content');
+  
+  // Başlangıçta aktif sekmeye scroll
+  const activeTab = document.querySelector('.tab-btn.tab-active');
+  if (activeTab) {
+    setTimeout(() => {
+      activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }, 100);
+  }
+  
   tabBtns.forEach(btn=>{
     btn.addEventListener('click',()=>{
       tabBtns.forEach(b=> b.classList.remove('tab-active'));
@@ -905,6 +953,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
           tc.classList.add('hidden');
         }
       });
+      
+      // Tıklanan sekmeyi görünür alana scroll
+      btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     });
   });
 
@@ -1222,6 +1273,29 @@ document.addEventListener('DOMContentLoaded', function() {
   white-space: nowrap;
   margin-left: 8px;
   z-index: 50;
+}
+
+/* Sekme stil güncellemeleri */
+.tab-btn {
+  position: relative;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.tab-active {
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+  font-weight: 600;
+}
+
+/* Mobil scroll gizleme */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }
 
 /* Mobil uyumluluk için ek stiller */

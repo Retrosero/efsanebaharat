@@ -14,22 +14,16 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $eposta = trim($_POST['eposta'] ?? '');
     $sifre = $_POST['sifre'] ?? '';
+    $beni_hatirla = isset($_POST['beni_hatirla']);
 
     if (empty($eposta) || empty($sifre)) {
         $error = 'Lütfen tüm alanları doldurun.';
     } else {
         try {
-            $stmt = $pdo->prepare("SELECT * FROM kullanicilar WHERE eposta = :eposta AND aktif = 1");
-            $stmt->execute([':eposta' => $eposta]);
-            $kullanici = $stmt->fetch();
+            // Kullanıcı girişini dene
+            $kullanici = kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla);
 
-            if ($kullanici && password_verify($sifre, $kullanici['sifre'])) {
-                // Oturum bilgilerini kaydet
-                $_SESSION['kullanici_id'] = $kullanici['id'];
-                $_SESSION['kullanici_adi'] = $kullanici['kullanici_adi'];
-                $_SESSION['eposta'] = $kullanici['eposta'];
-                $_SESSION['rol_id'] = $kullanici['rol_id'];
-
+            if ($kullanici) {
                 // Ana sayfaya yönlendir
                 header('Location: index.php');
                 exit;
@@ -103,6 +97,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Şifre</label>
                     <input type="password" name="sifre" class="w-full px-3 py-2 border border-gray-300 rounded-button focus:outline-none focus:ring-2 focus:ring-primary/20" required>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="beni_hatirla" name="beni_hatirla" class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary/20" checked>
+                    <label for="beni_hatirla" class="ml-2 block text-sm text-gray-700">Beni Hatırla</label>
                 </div>
 
                 <button type="submit" class="w-full bg-primary text-white py-2 px-4 rounded-button hover:bg-primary/90">

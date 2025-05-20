@@ -2,7 +2,23 @@
 // index.php
 require_once 'config.php';
 require_once 'includes/db.php';
-require_once 'includes/auth.php';
+
+// Kullanıcı adı görüntüleme sorununu doğrudan çözme
+if (isset($_SESSION['kullanici_id'])) {
+    try {
+        $user_stmt = $pdo->prepare("SELECT kullanici_adi FROM kullanicilar WHERE id = :id AND aktif = 1");
+        $user_stmt->execute([':id' => $_SESSION['kullanici_id']]);
+        $user_name = $user_stmt->fetchColumn();
+        
+        if ($user_name) {
+            $_SESSION['kullanici_adi'] = $user_name;
+        }
+    } catch (Exception $e) {
+        // Hata durumunda hiçbir şey yapma, mevcut session değerini kullan
+    }
+}
+
+// auth.php dosyası header.php içinde zaten dahil ediliyor
 include 'includes/header.php';
 
 ?>
@@ -24,91 +40,151 @@ include 'includes/header.php';
 endif; 
 ?>
 
-<!-- Dashboard İçeriği -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-  <!-- Küçük Kartlar -->
-  <div class="bg-white rounded-lg p-6 shadow-sm">
-    <div class="text-gray-500 mb-2">Toplam Gelir</div>
-    <div class="text-2xl font-semibold">₺458.623,45</div>
-    <div class="flex items-center mt-2 text-sm">
-      <i class="ri-arrow-up-line text-green-500"></i>
-      <span class="text-green-500">12.5%</span>
-      <span class="text-gray-500 ml-1">geçen aya göre</span>
-    </div>
-  </div>
-  <div class="bg-white rounded-lg p-6 shadow-sm">
-    <div class="text-gray-500 mb-2">Toplam Gider</div>
-    <div class="text-2xl font-semibold">₺245.891,23</div>
-    <div class="flex items-center mt-2 text-sm">
-      <i class="ri-arrow-down-line text-red-500"></i>
-      <span class="text-red-500">8.3%</span>
-      <span class="text-gray-500 ml-1">geçen aya göre</span>
-    </div>
-  </div>
-  <div class="bg-white rounded-lg p-6 shadow-sm">
-    <div class="text-gray-500 mb-2">Kasa Durumu</div>
-    <div class="text-2xl font-semibold">₺212.732,22</div>
-    <div class="flex items-center mt-2 text-sm">
-      <i class="ri-arrow-up-line text-green-500"></i>
-      <span class="text-green-500">5.2%</span>
-      <span class="text-gray-500 ml-1">geçen aya göre</span>
-    </div>
-  </div>
-  <div class="bg-white rounded-lg p-6 shadow-sm">
-    <div class="text-gray-500 mb-2">Vadesi Yaklaşan</div>
-    <div class="text-2xl font-semibold">₺89.456,78</div>
-    <div class="flex items-center mt-2 text-sm">
-      <i class="ri-time-line text-orange-500"></i>
-      <span class="text-orange-500">5 işlem</span>
-      <span class="text-gray-500 ml-1">önümüzdeki hafta</span>
-    </div>
-  </div>
+<!-- Menü Grid Düzeni -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+    <!-- Satış -->
+    <?php if (sayfaErisimKontrol($pdo, 'satis.php')): ?>
+    <a href="satis.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-blue-100">
+                <i class="ri-shopping-cart-line text-xl text-blue-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Satış</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Alış -->
+    <?php if (sayfaErisimKontrol($pdo, 'alis.php')): ?>
+    <a href="alis.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-green-100">
+                <i class="ri-store-line text-xl text-green-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Alış</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Alış Faturaları -->
+    <?php if (sayfaErisimKontrol($pdo, 'alis_faturalari.php')): ?>
+    <a href="alis_faturalari.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-purple-100">
+                <i class="ri-file-list-line text-xl text-purple-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Alış Faturaları</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Tahsilat -->
+    <?php if (sayfaErisimKontrol($pdo, 'tahsilat.php')): ?>
+    <a href="tahsilat.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-yellow-100">
+                <i class="ri-money-dollar-circle-line text-xl text-yellow-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Tahsilat</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Ürünler -->
+    <?php if (sayfaErisimKontrol($pdo, 'urunler.php')): ?>
+    <a href="urunler.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-indigo-100">
+                <i class="ri-box-3-line text-xl text-indigo-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Ürünler</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Müşteriler -->
+    <?php if (sayfaErisimKontrol($pdo, 'musteriler.php')): ?>
+    <a href="musteriler.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-orange-100">
+                <i class="ri-team-line text-xl text-orange-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Müşteriler</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Tedarikçiler -->
+    <?php if (sayfaErisimKontrol($pdo, 'tedarikciler.php')): ?>
+    <a href="tedarikciler.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-lime-100">
+                <i class="ri-truck-line text-xl text-lime-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Tedarikçiler</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Kullanıcılar -->
+    <?php if (sayfaErisimKontrol($pdo, 'kullanicilar.php')): ?>
+    <a href="kullanicilar.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-pink-100">
+                <i class="ri-user-line text-xl text-pink-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Kullanıcılar</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Roller -->
+    <?php if (sayfaErisimKontrol($pdo, 'roller.php')): ?>
+    <a href="roller.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-red-100">
+                <i class="ri-shield-user-line text-xl text-red-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Roller</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Raporlar -->
+    <?php if (sayfaErisimKontrol($pdo, 'raporlar.php')): ?>
+    <a href="raporlar.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-cyan-100">
+                <i class="ri-bar-chart-line text-xl text-cyan-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Raporlar</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Gün Sonu -->
+    <?php if (sayfaErisimKontrol($pdo, 'gunsonu.php')): ?>
+    <a href="gunsonu.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-purple-100">
+                <i class="ri-time-line text-xl text-purple-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Gün Sonu</span>
+        </div>
+    </a>
+    <?php endif; ?>
+
+    <!-- Ayarlar -->
+    <?php if (sayfaErisimKontrol($pdo, 'ayarlar.php')): ?>
+    <a href="ayarlar.php" class="block p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 mb-3 flex items-center justify-center rounded-full bg-gray-100">
+                <i class="ri-settings-line text-xl text-gray-500"></i>
+            </div>
+            <span class="text-gray-700 text-sm font-medium">Ayarlar</span>
+        </div>
+    </a>
+    <?php endif; ?>
 </div>
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-  <div class="bg-white rounded-lg p-6 shadow-sm">
-    <div class="flex items-center justify-between mb-6">
-      <h3 class="font-semibold">Gelir-Gider Grafiği</h3>
-      <select class="bg-gray-100 rounded px-3 py-1 text-sm">
-        <option>Son 6 Ay</option>
-        <option>Son 1 Yıl</option>
-      </select>
-    </div>
-    <div id="incomeExpenseChart" class="chart-container" style="min-height: 300px;"></div>
-  </div>
-  <div class="bg-white rounded-lg p-6 shadow-sm">
-    <div class="flex items-center justify-between mb-6">
-      <h3 class="font-semibold">Cari Hesap Dağılımı</h3>
-      <select class="bg-gray-100 rounded px-3 py-1 text-sm">
-        <option>Tümü</option>
-        <option>Borçlular</option>
-        <option>Alacaklılar</option>
-      </select>
-    </div>
-    <div id="accountsPieChart" class="chart-container" style="min-height: 300px;"></div>
-  </div>
-</div>
-
-<!-- vs... buraya ana sayfa kısımları devam -->
-<script>
-// ECharts örnekleri
-const incomeExpenseChart = echarts.init(document.getElementById('incomeExpenseChart'));
-const accountsPieChart = echarts.init(document.getElementById('accountsPieChart'));
-
-const incomeExpenseOption = {
-  // ...
-};
-const accountsPieOption = {
-  // ...
-};
-
-incomeExpenseChart.setOption(incomeExpenseOption);
-accountsPieChart.setOption(accountsPieOption);
-
-window.addEventListener('resize', () => {
-  incomeExpenseChart.resize();
-  accountsPieChart.resize();
-});
-</script>
 
 <?php include 'includes/footer.php'; ?>

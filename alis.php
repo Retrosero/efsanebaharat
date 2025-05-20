@@ -167,6 +167,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
         
+        // Müşteri bakiyesini güncelle (alış faturası oluşturuldu)
+        $stmtMusteriGuncelle = $pdo->prepare("
+            UPDATE musteriler 
+            SET cari_bakiye = cari_bakiye - :toplam_tutar 
+            WHERE id = :musteri_id
+        ");
+        $stmtMusteriGuncelle->execute([
+            ':toplam_tutar' => $toplam_tutar,
+            ':musteri_id' => $musteri_id
+        ]);
+        
+        // İşlem başarılı olduğunda log tutma
+        error_log("Alış faturası eklendi: ID=$fatura_id, Tutar=$toplam_tutar, Müşteri ID=$musteri_id");
+        
         $pdo->commit();
         $successMessage = "Alış faturası başarıyla kaydedildi.";
         
@@ -266,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <thead>
             <tr class="bg-gray-50">
               <th class="py-2 px-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ürün</th>
-              <th class="py-2 px-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Miktar</th>
+              <th class="py-2 px-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Miktar(1Kg için 1000 gir)</th>
               <th class="py-2 px-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Birim Fiyat</th>
               <th class="py-2 px-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam</th>
               <th class="py-2 px-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
@@ -384,6 +398,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Türkçe karakter dönüştürme fonksiyonu
+  function turkishToLower(text) {
+    const letters = {
+      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ', 'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç',
+      'i': 'i', 'ı': 'ı', 'ş': 'ş', 'ğ': 'ğ', 'ü': 'ü', 'ö': 'ö', 'ç': 'ç'
+    };
+    return text.replace(/[İIŞĞÜÖÇiışğüöç]/g, letter => letters[letter] || letter).toLowerCase();
+  }
+
+  function normalizeString(text) {
+    const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return normalized.replace(/[İIŞĞÜÖÇiışğüöç]/g, char => {
+      return {
+        'İ': 'i', 'I': 'i', 'Ş': 's', 'Ğ': 'g', 'Ü': 'u', 'Ö': 'o', 'Ç': 'c',
+        'i': 'i', 'ı': 'i', 'ş': 's', 'ğ': 'g', 'ü': 'u', 'ö': 'o', 'ç': 'c'
+      }[char] || char;
+    }).toLowerCase();
+  }
+
   // Ürün verilerini JavaScript'e aktar
   const urunler = <?= $urunlerJson ?>;
   
@@ -394,7 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const selectedMusteri = document.getElementById('selected_musteri');
   
   musteriSearch.addEventListener('input', function() {
-    const searchTerm = this.value.toLowerCase().trim();
+    const searchTerm = this.value.trim();
     
     if (searchTerm.length < 2) {
       musteriResults.classList.add('hidden');
@@ -404,9 +437,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Müşterileri filtrele
     const options = Array.from(musteriSelect.options).slice(1); // İlk option'ı (placeholder) atla
     const filteredOptions = options.filter(option => {
-      const ad = option.getAttribute('data-ad').toLowerCase();
-      const soyad = option.getAttribute('data-soyad').toLowerCase();
-      return ad.includes(searchTerm) || soyad.includes(searchTerm) || `${ad} ${soyad}`.includes(searchTerm);
+      const ad = turkishToLower(option.getAttribute('data-ad'));
+      const soyad = turkishToLower(option.getAttribute('data-soyad'));
+      const searchTermLower = turkishToLower(searchTerm);
+      const normalizedSearchTerm = normalizeString(searchTerm);
+
+      return ad.includes(searchTermLower) || 
+             soyad.includes(searchTermLower) || 
+             `${ad} ${soyad}`.includes(searchTermLower) ||
+             normalizeString(ad).includes(normalizedSearchTerm) ||
+             normalizeString(soyad).includes(normalizedSearchTerm) ||
+             normalizeString(`${ad} ${soyad}`).includes(normalizedSearchTerm);
     });
     
     // Sonuçları göster
@@ -497,7 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Ürün arama fonksiyonu
   function urunAra() {
-    const searchTerm = this.value.toLowerCase().trim();
+    const searchTerm = this.value.trim();
     const satir = this.closest('tr');
     const urunResults = satir.querySelector('.urun-results');
     const urunSelect = satir.querySelector('.urun-select');
@@ -510,10 +551,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ürünleri filtrele
     const options = Array.from(urunSelect.options).slice(1); // İlk option'ı (placeholder) atla
     const filteredOptions = options.filter(option => {
-      const urunAdi = option.getAttribute('data-ad').toLowerCase();
-      const urunKodu = option.getAttribute('data-kod').toLowerCase();
+      const urunAdi = turkishToLower(option.getAttribute('data-ad'));
+      const urunKodu = turkishToLower(option.getAttribute('data-kod'));
+      const searchTermLower = turkishToLower(searchTerm);
+      const normalizedSearchTerm = normalizeString(searchTerm);
       
-      return urunAdi.includes(searchTerm) || urunKodu.includes(searchTerm);
+      return urunAdi.includes(searchTermLower) || 
+             urunKodu.includes(searchTermLower) ||
+             normalizeString(urunAdi).includes(normalizedSearchTerm) ||
+             normalizeString(urunKodu).includes(normalizedSearchTerm);
     });
     
     // Sonuçları göster

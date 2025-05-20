@@ -99,6 +99,15 @@ try {
                 $stmtSatis->execute([':mid' => $m['id']]);
                 $toplam_satis = $stmtSatis->fetchColumn();
 
+                // Alışları hesapla (faturalar tablosundan)
+                $stmtAlis = $pdo->prepare("
+                    SELECT COALESCE(SUM(toplam_tutar), 0) as toplam_alis 
+                    FROM faturalar 
+                    WHERE musteri_id = :mid AND fatura_turu = 'alis'
+                ");
+                $stmtAlis->execute([':mid' => $m['id']]);
+                $toplam_alis = $stmtAlis->fetchColumn();
+
                 // Tahsilatları hesapla (odeme_tahsilat tablosundan)
                 $stmtTahsilat = $pdo->prepare("
                     SELECT COALESCE(SUM(tutar), 0) as toplam_tahsilat 
@@ -108,8 +117,8 @@ try {
                 $stmtTahsilat->execute([':mid' => $m['id']]);
                 $toplam_tahsilat = $stmtTahsilat->fetchColumn();
 
-                // Gerçek bakiyeyi hesapla (satışlar - tahsilatlar)
-                $m['gercek_bakiye'] = $toplam_satis - $toplam_tahsilat;
+                // Gerçek bakiyeyi hesapla (satışlar - alışlar - tahsilatlar)
+                $m['gercek_bakiye'] = $toplam_satis - $toplam_alis - $toplam_tahsilat;
             } catch (Exception $e) {
                 // Bakiye hesaplanamadıysa varsayılan değer ata
                 $m['gercek_bakiye'] = 0;
@@ -213,8 +222,74 @@ try {
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow overflow-hidden mx-4 my-4">
-            <div class="overflow-x-auto w-full" style="max-width: 100vw;">
+        <!-- Mobil Görünüm için Kart Tasarımı -->
+        <div class="block md:hidden">
+            <div id="customerCards" class="grid grid-cols-1 gap-3 mx-1">
+                <?php foreach ($musteriler as $musteri): 
+                    $bakiye = $musteri['gercek_bakiye'] ?? 0;
+                    $bakiyeClass = $bakiye > 0 ? 'text-red-500' : ($bakiye < 0 ? 'text-green-500' : 'text-gray-900');
+                    $bakiyeText = $bakiye > 0 ? number_format($bakiye, 2, ',', '.') . ' ₺ (Borçlu)' : 
+                                ($bakiye < 0 ? number_format(abs($bakiye), 2, ',', '.') . ' ₺ (Alacaklı)' : '0,00 ₺');
+                ?>
+                <div 
+                    class="bg-white rounded-lg shadow p-3 cursor-pointer" 
+                    onclick="window.location.href='musteri_detay.php?id=<?= $musteri['id'] ?>'"
+                >
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">
+                                <?= htmlspecialchars($musteri['ad'] . ' ' . $musteri['soyad']) ?>
+                                <?php if (isset($musteri['aktif']) && $musteri['aktif'] == 0): ?>
+                                    <span class="ml-1 px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded-full">Pasif</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                Kod: <?= htmlspecialchars($musteri['musteri_kodu'] ?? '') ?>
+                            </div>
+                        </div>
+                        <div class="<?= $bakiyeClass ?> text-xs font-medium text-right">
+                            <?= $bakiyeText ?>
+                        </div>
+                    </div>
+                    <div class="mt-2 grid grid-cols-2 gap-1">
+                        <div class="text-xs text-gray-600">
+                            <span class="font-medium">Tip:</span> 
+                            <?php 
+                            if (!empty($musteri['tip_id'])) {
+                                $tip_bulundu = false;
+                                foreach ($musteri_tipleri as $tip) {
+                                    if ($tip['id'] == $musteri['tip_id']) {
+                                        echo htmlspecialchars($tip['tip_adi']);
+                                        $tip_bulundu = true;
+                                        break;
+                                    }
+                                }
+                                if (!$tip_bulundu) {
+                                    echo 'Müşteri';
+                                }
+                            } else {
+                                echo 'Müşteri';
+                            }
+                            ?>
+                        </div>
+                        <div class="text-xs text-gray-600">
+                            <span class="font-medium">Telefon:</span> <?= htmlspecialchars($musteri['telefon'] ?: '-') ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                
+                <?php if (empty($musteriler)): ?>
+                <div class="bg-white rounded-lg shadow p-4 text-center text-gray-500 text-sm">
+                    Henüz müşteri kaydı bulunmuyor.
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Masaüstü Görünüm için Tablo Tasarımı -->
+        <div class="hidden md:block bg-white rounded-lg shadow overflow-hidden mx-4 my-4">
+            <div class="overflow-x-auto w-full">
                 <table class="w-full" id="customersTable">
                     <thead>
                         <tr class="bg-gray-50 border-b border-gray-200">
@@ -229,8 +304,8 @@ try {
                         <?php foreach ($musteriler as $musteri): 
                             $bakiye = $musteri['gercek_bakiye'] ?? 0;
                             $bakiyeClass = $bakiye > 0 ? 'text-red-500' : ($bakiye < 0 ? 'text-green-500' : 'text-gray-900');
-                            $bakiyeText = $bakiye > 0 ? number_format($bakiye, 2, ',', '.') . ' ₺ (Borç)' : 
-                                        ($bakiye < 0 ? number_format(abs($bakiye), 2, ',', '.') . ' ₺ (Alacak)' : '0,00 ₺');
+                            $bakiyeText = $bakiye > 0 ? number_format($bakiye, 2, ',', '.') . ' ₺ (Borçlu)' : 
+                                        ($bakiye < 0 ? number_format(abs($bakiye), 2, ',', '.') . ' ₺ (Alacaklı)' : '0,00 ₺');
                         ?>
                         <tr 
                             class="hover:bg-gray-50 cursor-pointer transition-colors" 
@@ -295,12 +370,15 @@ try {
 document.addEventListener('DOMContentLoaded', function() {
     const table = document.getElementById('customersTable');
     const rows = table.querySelectorAll('tbody tr');
+    const customerCards = document.getElementById('customerCards');
+    const cardItems = customerCards ? customerCards.querySelectorAll('div[onclick]') : [];
     
     // Arama işlevi
     const searchInput = document.getElementById('searchInput');
     searchInput.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();
         
+        // Tablo satırlarını filtrele
         rows.forEach(row => {
             const text = row.textContent.toLowerCase();
             if (text.includes(searchTerm)) {
@@ -309,6 +387,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.style.display = 'none';
             }
         });
+        
+        // Mobil kartları filtrele
+        if (cardItems.length > 0) {
+            cardItems.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
         
         updatePagination();
     });
@@ -323,19 +413,22 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updatePagination() {
         const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+        const visibleCards = Array.from(cardItems).filter(card => card.style.display !== 'none');
         const totalRows = visibleRows.length;
-        const totalPages = Math.ceil(totalRows / parseInt(pageSize.value));
+        const totalCards = visibleCards.length;
+        const totalItems = Math.max(totalRows, totalCards);
+        const totalPages = Math.ceil(totalItems / parseInt(pageSize.value));
         
         // Sayfa bilgisini güncelle
         const start = (currentPage - 1) * parseInt(pageSize.value) + 1;
-        const end = Math.min(currentPage * parseInt(pageSize.value), totalRows);
+        const end = Math.min(currentPage * parseInt(pageSize.value), totalItems);
         
-        if (totalRows > 0) {
+        if (totalItems > 0) {
             // Eğer "Tümü" seçiliyse (1000 değeri)
             if (parseInt(pageSize.value) >= 1000) {
-                paginationInfo.textContent = `Toplam ${totalRows} kayıt gösteriliyor`;
+                paginationInfo.textContent = `Toplam ${totalItems} kayıt gösteriliyor`;
             } else {
-                paginationInfo.textContent = `${totalRows} kayıttan ${start} - ${end} arasındaki kayıtlar gösteriliyor`;
+                paginationInfo.textContent = `${totalItems} kayıttan ${start} - ${end} arasındaki kayıtlar gösteriliyor`;
             }
         } else {
             paginationInfo.textContent = 'Gösterilecek kayıt bulunamadı';
@@ -356,6 +449,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.style.display = 'none';
             }
         });
+        
+        // Mobil kartları güncelle
+        if (visibleCards.length > 0) {
+            visibleCards.forEach((card, index) => {
+                if (parseInt(pageSize.value) >= 1000) {
+                    card.style.display = '';
+                } else if (index >= (currentPage - 1) * parseInt(pageSize.value) && index < currentPage * parseInt(pageSize.value)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
     }
     
     // Sayfa boyutu değiştiğinde
@@ -375,8 +481,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sonraki sayfa
     nextPage.addEventListener('click', function() {
         const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
-        const totalRows = visibleRows.length;
-        const totalPages = Math.ceil(totalRows / parseInt(pageSize.value));
+        const visibleCards = Array.from(cardItems).filter(card => card.style.display !== 'none');
+        const totalItems = Math.max(visibleRows.length, visibleCards.length);
+        const totalPages = Math.ceil(totalItems / parseInt(pageSize.value));
         
         if (currentPage < totalPages) {
             currentPage++;

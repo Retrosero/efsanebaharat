@@ -100,7 +100,6 @@ $aciklama = $tahsilat['aciklama'] ?? ''; // Açıklamayı veritabanından al
   <div class="flex space-x-2">
     <button 
       id="backButton"
-      onclick="history.back()" 
       class="flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"
     >
       <i class="ri-arrow-left-line mr-2"></i> Geri
@@ -119,7 +118,7 @@ $aciklama = $tahsilat['aciklama'] ?? ''; // Açıklamayı veritabanından al
     <!-- Sil Butonu -->
     <button 
       type="button"
-      onclick="showDeleteModal(<?= $tahsilat_id ?>)"
+      id="deleteButton"
       class="flex items-center px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-button text-sm"
     >
       <i class="ri-delete-bin-line mr-2"></i> Sil
@@ -127,7 +126,7 @@ $aciklama = $tahsilat['aciklama'] ?? ''; // Açıklamayı veritabanından al
     
     <!-- Yazdır Butonu -->
     <button 
-      onclick="window.print()" 
+      id="printButton"
       class="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"
     >
       <i class="ri-printer-line mr-2"></i> Yazdır
@@ -143,14 +142,14 @@ $aciklama = $tahsilat['aciklama'] ?? ''; // Açıklamayı veritabanından al
     <div class="flex justify-end space-x-3">
       <button 
         type="button" 
-        onclick="closeDeleteModal()"
+        id="cancelDeleteBtn"
         class="px-4 py-2 bg-gray-100 text-gray-700 rounded-button text-sm"
       >
         İptal
       </button>
       <button 
         type="button" 
-        onclick="deleteTahsilat()"
+        id="confirmDeleteBtn"
         class="px-4 py-2 bg-red-600 text-white rounded-button text-sm"
       >
         Sil
@@ -178,7 +177,7 @@ $aciklama = $tahsilat['aciklama'] ?? ''; // Açıklamayı veritabanından al
         <i class="ri-search-line absolute right-3 top-2.5 text-gray-400"></i>
       </div>
       <button 
-        onclick="window.print()"
+        id="printButton2"
         class="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm"
       >
         <i class="ri-printer-line mr-2"></i> Yazdır
@@ -286,144 +285,204 @@ $aciklama = $tahsilat['aciklama'] ?? ''; // Açıklamayı veritabanından al
 </div>
 
 <script>
-const saveButton=document.getElementById('saveButton');
-const saveOptions=document.getElementById('saveOptions');
-saveButton.addEventListener('click',()=>{
-  saveOptions.classList.toggle('hidden');
-});
-document.addEventListener('click',(e)=>{
-  if(!saveButton.contains(e.target) && !saveOptions.contains(e.target)){
-    saveOptions.classList.add('hidden');
+// Güvenli bir şekilde PHP değişkenlerini JavaScript'e aktaralım
+const tahsilatData = {
+  id: <?php echo (int)$tahsilat_id; ?>,
+  no: <?php echo json_encode($tahsilatNo); ?>,
+  tarih: <?php echo json_encode($tarih); ?>,
+  tutar: <?php echo json_encode($tutar); ?>,
+  odemeYontemi: <?php echo json_encode($odemeYontemi); ?>,
+  musteri: <?php echo json_encode($tahsilat['musteri_ad'].' '.$tahsilat['musteri_soyad']); ?>,
+  vergiNo: <?php echo json_encode($tahsilat['vergi_no'] ?? '-----'); ?>,
+  adres: <?php echo json_encode($tahsilat['adres'] ?? 'Adres Yok'); ?>,
+  aciklama: <?php echo json_encode($aciklama); ?>
+};
+
+// Sayfa yüklendiğinde çalışacak kodlar
+document.addEventListener('DOMContentLoaded', function() {
+  // DOM elementlerini al
+  const deleteModal = document.getElementById('deleteModal');
+  const deleteButton = document.getElementById('deleteButton');
+  const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+  const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+  const backButton = document.getElementById('backButton');
+  const printButton = document.getElementById('printButton');
+  const printButton2 = document.getElementById('printButton2');
+  const searchInput = document.getElementById('tahsilatDetaySearch');
+  
+  // Geri butonu
+  if (backButton) {
+    backButton.addEventListener('click', function() {
+      history.back();
+    });
   }
-});
-
-// PDF
-function savePDF(){
-  const { jsPDF }=window.jspdf;
-  const doc=new jsPDF();
-  html2canvas(document.getElementById('printArea')).then(canvas=>{
-    const imgData=canvas.toDataURL('image/png');
-    const imgWidth=210; // A4 - 210mm
-    const pageHeight=295;
-    const imgHeight=canvas.height*imgWidth/canvas.width;
-    let position=0;
-    doc.addImage(imgData,'PNG',0,position,imgWidth,imgHeight);
-    doc.save('tahsilat-detay.pdf');
+  
+  // Yazdır butonları
+  if (printButton) {
+    printButton.addEventListener('click', function() {
+      window.print();
+    });
+  }
+  
+  if (printButton2) {
+    printButton2.addEventListener('click', function() {
+      window.print();
   });
 }
 
-// Excel
-function saveExcel(){
-    const data = [
-        ['Tahsilat No', '<?= $tahsilatNo ?>'],
-        ['Tarih', '<?= $tarih ?>'],
-        ['Tutar', '<?= $tutar ?>₺'],
-        ['Ödeme Yöntemi', '<?= htmlspecialchars($odemeYontemi) ?>'],
-        ['Ad Soyad', '<?= htmlspecialchars($tahsilat['musteri_ad'].' '.$tahsilat['musteri_soyad']) ?>'],
-        ['TC/Vergi No', '<?= htmlspecialchars($tahsilat['vergi_no'] ?? '-----') ?>'],
-        ['Adres', '<?= htmlspecialchars($tahsilat['adres'] ?? 'Adres Yok') ?>']
-    ];
-
-    <?php if($tahsilat['banka_adi']): ?>
-    data.push(['Banka', '<?= htmlspecialchars($tahsilat['banka_adi']) ?>']);
-    <?php endif; ?>
-
-    <?php if($tahsilat['cek_senet_no']): ?>
-    data.push(['<?= $tahsilat['odeme_yontemi'] === 'cek' ? 'Çek No' : 'Senet No' ?>', 
-               '<?= htmlspecialchars($tahsilat['cek_senet_no']) ?>']);
-    <?php endif; ?>
-
-    <?php if($tahsilat['vade_tarihi']): ?>
-    data.push(['Vade Tarihi', '<?= date('d.m.Y', strtotime($tahsilat['vade_tarihi'])) ?>']);
-    <?php endif; ?>
-
-    data.push(['Açıklama', '<?= htmlspecialchars($aciklama) ?>']);
-
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Tahsilat Detay');
-    XLSX.writeFile(wb, 'tahsilat-detay.xlsx');
-}
-
-// PNG
-function savePNG(){
-  html2canvas(document.getElementById('printArea')).then(canvas=>{
-    const link=document.createElement('a');
-    link.download='tahsilat-detay.png';
-    link.href=canvas.toDataURL();
-    link.click();
-  });
-}
-
-// Silme işlemleri için JavaScript
-let tahsilatIdToDelete = 0;
-
-function showDeleteModal(id) {
-  tahsilatIdToDelete = id;
-  document.getElementById('deleteModal').classList.remove('hidden');
-}
-
-function closeDeleteModal() {
-  document.getElementById('deleteModal').classList.add('hidden');
-}
-
-function deleteTahsilat() {
-  // AJAX ile silme işlemi
+  // Silme işlemleri
+  if (deleteButton && deleteModal && confirmDeleteBtn && cancelDeleteBtn) {
+    // Silme butonuna event listener ekle
+    deleteButton.addEventListener('click', function() {
+      deleteModal.classList.remove('hidden');
+    });
+    
+    // Silme işlemi
+    confirmDeleteBtn.addEventListener('click', function() {
+      const formData = new FormData();
+      formData.append('islem', 'tahsilat_sil');
+      formData.append('id', tahsilatData.id);
+      
   fetch('ajax_islem.php', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: `islem=tahsilat_sil&id=${tahsilatIdToDelete}`
+        body: formData
   })
   .then(response => response.json())
   .then(data => {
     if (data.success) {
-      // Silme başarılı - önceki sayfaya dön
-      window.location.href = document.referrer;
+          alert('Tahsilat başarıyla silindi.');
+          window.location.href = 'tahsilat.php';
     } else {
-      // Hata durumunda alert göster
-      alert('Hata: ' + data.message);
-      closeDeleteModal();
+          alert('Hata: ' + (data.message || 'Bilinmeyen bir hata oluştu'));
+          deleteModal.classList.add('hidden');
     }
   })
   .catch(error => {
-    console.error('Error:', error);
+        console.error('Silme hatası:', error);
     alert('İşlem sırasında bir hata oluştu.');
-    closeDeleteModal();
+        deleteModal.classList.add('hidden');
+      });
+    });
+    
+    // İptal butonu
+    cancelDeleteBtn.addEventListener('click', function() {
+      deleteModal.classList.add('hidden');
   });
-}
 
-// Modal dışına tıklandığında kapatma
-document.getElementById('deleteModal').addEventListener('click', function(e) {
-  if (e.target === this) {
-    closeDeleteModal();
+    // Modal dışına tıklandığında kapat
+    deleteModal.addEventListener('click', function(e) {
+      if (e.target === deleteModal) {
+        deleteModal.classList.add('hidden');
   }
 });
 
-// ESC tuşu ile modalı kapatma
+    // ESC tuşu ile modal kapatma
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    closeDeleteModal();
+      if (e.key === 'Escape' && !deleteModal.classList.contains('hidden')) {
+        deleteModal.classList.add('hidden');
   }
 });
+  }
 
-// Sayfa yüklendiğinde
-document.addEventListener('DOMContentLoaded', function() {
   // Arama fonksiyonu
-  const searchInput = document.getElementById('tahsilatDetaySearch');
   if (searchInput) {
     searchInput.addEventListener('keyup', function() {
       const searchTerm = this.value.toLowerCase();
-      const tableRows = document.querySelectorAll('table tbody tr');
+      const printArea = document.getElementById('printArea');
       
-      tableRows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(searchTerm) ? '' : 'none';
+      if (printArea) {
+        const searchableAreas = printArea.querySelectorAll('.p-3');
+        searchableAreas.forEach(area => {
+          const text = area.textContent.toLowerCase();
+          if (text.includes(searchTerm)) {
+            area.style.backgroundColor = '#FFFDE7'; // Hafif sarı vurgu
+          } else {
+            area.style.backgroundColor = '#f9fafb'; // Normal renk
+          }
       });
+      }
     });
   }
 });
+
+// PDF, Excel ve PNG fonksiyonları
+function savePDF() {
+  const printArea = document.getElementById('printArea');
+  if (!printArea || !window.jspdf) return;
+  
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    html2canvas(printArea).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 210; // A4 - 210mm
+      const pageHeight = 295;
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      let position = 0;
+      doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      doc.save('tahsilat-detay.pdf');
+    });
+  } catch(e) {
+    console.error('PDF oluşturma hatası:', e);
+  }
+}
+
+function saveExcel() {
+  if (!window.XLSX) return;
+  
+  try {
+    const data = [
+      ['Tahsilat No', tahsilatData.no],
+      ['Tarih', tahsilatData.tarih],
+      ['Tutar', tahsilatData.tutar + '₺'],
+      ['Ödeme Yöntemi', tahsilatData.odemeYontemi],
+      ['Ad Soyad', tahsilatData.musteri],
+      ['TC/Vergi No', tahsilatData.vergiNo],
+      ['Adres', tahsilatData.adres]
+    ];
+    
+    <?php if(isset($tahsilat['banka_adi']) && $tahsilat['banka_adi']): ?>
+    data.push(['Banka', <?php echo json_encode($tahsilat['banka_adi']); ?>]);
+    <?php endif; ?>
+    
+    <?php if(isset($tahsilat['cek_senet_no']) && $tahsilat['cek_senet_no']): ?>
+    data.push([
+      <?php echo json_encode($tahsilat['odeme_yontemi'] === 'cek' ? 'Çek No' : 'Senet No'); ?>, 
+      <?php echo json_encode($tahsilat['cek_senet_no']); ?>
+    ]);
+    <?php endif; ?>
+    
+    <?php if(isset($tahsilat['vade_tarihi']) && $tahsilat['vade_tarihi']): ?>
+    data.push(['Vade Tarihi', <?php echo json_encode(date('d.m.Y', strtotime($tahsilat['vade_tarihi']))); ?>]);
+    <?php endif; ?>
+    
+    data.push(['Açıklama', tahsilatData.aciklama]);
+    
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tahsilat Detay');
+    XLSX.writeFile(wb, 'tahsilat-detay.xlsx');
+  } catch(e) {
+    console.error('Excel oluşturma hatası:', e);
+  }
+}
+
+function savePNG() {
+  const printArea = document.getElementById('printArea');
+  if (!printArea) return;
+  
+  try {
+    html2canvas(printArea).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'tahsilat-detay.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+  } catch(e) {
+    console.error('PNG oluşturma hatası:', e);
+  }
+}
 </script>
 </body>
 </html>

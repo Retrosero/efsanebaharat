@@ -1,9 +1,15 @@
 <?php
 // includes/auth.php
 
-// Oturum başlatma (eğer başlamadıysa)
+// Oturum ayarlarını yapabilmek için önce oturum durumunu kontrol et
 if (session_status() == PHP_SESSION_NONE) {
-    // Oturum ve çerezlerin güvenliği için ayarlar (oturum başlamadan önce)
+    // Oturum başlamadan önce ayarları yapabiliriz
+    // Oturum süresini uzun tutacak ayarlar
+    ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60); // 30 gün (saniye cinsinden)
+    ini_set('session.cookie_lifetime', 30 * 24 * 60 * 60); // 30 gün (saniye cinsinden)
+    session_name('efsanebaharat_session');
+    
+    // Oturum ve çerezlerin güvenliği için ayarlar
     ini_set('session.cookie_httponly', 1);
     ini_set('session.use_only_cookies', 1);
     ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
@@ -24,7 +30,7 @@ define('REMEMBER_COOKIE_DURATION', 60 * 60 * 24 * 30); // 30 gün
  * @param bool $beni_hatirla Beni hatırla seçeneği
  * @return bool|array Başarılı ise kullanıcı bilgileri, başarısız ise false
  */
-function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = false) {
+function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) { // Varsayılan olarak true yaptık
     try {
         // Kullanıcıyı veritabanında ara
         $stmt = $pdo->prepare("SELECT * FROM kullanicilar WHERE eposta = :eposta AND aktif = 1");
@@ -41,6 +47,7 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = false) {
         $_SESSION['kullanici_adi'] = $kullanici['kullanici_adi'];
         $_SESSION['eposta'] = $kullanici['eposta'];
         $_SESSION['rol_id'] = $kullanici['rol_id'];
+        $_SESSION['son_aktivite'] = time(); // Oturum süresini uzatmak için son aktivite zamanını kaydet
         
         // Beni hatırla seçeneği işaretlendiyse
         if ($beni_hatirla) {
@@ -98,6 +105,7 @@ function hatirlamaTokeniKontrol($pdo) {
             $_SESSION['kullanici_adi'] = $kullanici['kullanici_adi'];
             $_SESSION['eposta'] = $kullanici['eposta'];
             $_SESSION['rol_id'] = $kullanici['rol_id'];
+            $_SESSION['son_aktivite'] = time(); // Son aktivite zamanını güncelle
             
             // Token süresini yenile
             $stmt = $pdo->prepare("
@@ -123,11 +131,15 @@ function kullaniciCikis() {
     unset($_SESSION['kullanici_adi']);
     unset($_SESSION['eposta']);
     unset($_SESSION['rol_id']);
+    unset($_SESSION['son_aktivite']);
     
     // Hatırlama çerezini sil
     if (isset($_COOKIE[REMEMBER_COOKIE_NAME])) {
         setcookie(REMEMBER_COOKIE_NAME, '', time() - 3600, '/');
     }
+    
+    // Oturum çerezini sil
+    setcookie(session_name(), '', time() - 3600, '/');
     
     // Oturumu yok et
     session_destroy();
@@ -171,6 +183,36 @@ function sayfaErisimKontrol($pdo, $sayfa_url = null) {
     // Yönetici rolü (rol_id = 1) her sayfaya erişebilir
     if ($_SESSION['rol_id'] == 1) {
         return true;
+    }
+    
+    // Sol menünün index sayfasında görüntülenme davranışını düzeltmek için
+    // Sadece index.php sayfasına tüm kullanıcılar erişebilir ancak sol menü gösterimi 
+    // diğer sayfalar için erişim kontrolüne göre yapılmalı
+    $current_page = basename($_SERVER['PHP_SELF']);
+    if ($current_page == 'index.php' && $sayfa_url != 'index.php') {
+        // İndex sayfasında sol menü için yapılan erişim kontrolü
+        try {
+            // Kullanıcının rolüne göre sayfa erişim izni var mı kontrol et
+            $stmt = $pdo->prepare("
+                SELECT rsi.izin 
+                FROM rol_sayfa_izinleri rsi
+                JOIN sayfalar s ON rsi.sayfa_id = s.id
+                WHERE rsi.rol_id = :rol_id AND s.sayfa_url = :sayfa_url
+            ");
+            
+            $stmt->execute([
+                ':rol_id' => $_SESSION['rol_id'],
+                ':sayfa_url' => $sayfa_url
+            ]);
+            
+            $izin = $stmt->fetchColumn();
+            
+            // İzin varsa (1) veya izin kaydı yoksa (null)
+            return ($izin == 1);
+        } catch (Exception $e) {
+            error_log('Sayfa erişim kontrolü hatası: ' . $e->getMessage());
+            return false;
+        }
     }
     
     try {
@@ -220,9 +262,31 @@ function sayfaErisimGerekli($pdo, $sayfa_url = null, $yonlendir_url = 'index.php
 function checkAuth() {
     // Eğer kullanıcı giriş yapmamışsa
     if (!isset($_SESSION['kullanici_id'])) {
-        // Giriş sayfasına yönlendir
-        header('Location: giris.php');
-        exit;
+        // Hatırlama tokenini kontrol et
+        global $pdo;
+        if (!hatirlamaTokeniKontrol($pdo)) {
+            // Token yoksa veya geçersizse giriş sayfasına yönlendir
+            header('Location: giris.php');
+            exit;
+        }
+    } else {
+        // Kullanıcı giriş yapmışsa, kullanıcı bilgilerini güncelleyelim
+        // Bu kısım özellikle index.php sayfasında kullanıcı adının güncel olması için eklendi
+        global $pdo;
+        try {
+            $stmt = $pdo->prepare("SELECT kullanici_adi FROM kullanicilar WHERE id = :id AND aktif = 1");
+            $stmt->execute([':id' => $_SESSION['kullanici_id']]);
+            $kullanici_adi = $stmt->fetchColumn();
+            
+            if ($kullanici_adi) {
+                $_SESSION['kullanici_adi'] = $kullanici_adi;
+            }
+        } catch (Exception $e) {
+            // Hata durumunda hiçbir şey yapma
+        }
+        
+        // Son aktivite zamanını güncelle
+        $_SESSION['son_aktivite'] = time();
     }
 }
 

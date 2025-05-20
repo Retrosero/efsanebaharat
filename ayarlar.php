@@ -564,7 +564,10 @@ $kategoriler = $pdo->query("SELECT * FROM kategoriler ORDER BY kategori_adi")->f
                                             <input type="tel" name="telefon" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="<?= htmlspecialchars($kullanici['telefon'] ?? '') ?>">
                                         </div>
                                     </div>
-                                    <div class="mt-4 flex justify-end">
+                                    <div class="mt-4 flex justify-end space-x-3">
+                                        <a href="logout.php" class="px-4 py-2 bg-red-600 text-white rounded-button hover:bg-red-700 flex items-center">
+                                            <i class="ri-logout-box-line mr-2"></i>Çıkış Yap
+                                        </a>
                                         <button type="submit" class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">Profil Bilgilerini Güncelle</button>
                                     </div>
                                 </form>

@@ -323,7 +323,6 @@ foreach($faturalar as $fatura) {
                             <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ürün Adı</th>
                             <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Miktar</th>
                             <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Birim Fiyat</th>
-                            <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">KDV</th>
                             <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Toplam</th>
                         </tr>
                     </thead>
@@ -333,18 +332,15 @@ foreach($faturalar as $fatura) {
         if (detaylar.length === 0) {
             html += `
                 <tr>
-                    <td colspan="6" class="px-3 py-4 text-center text-sm text-gray-500">Fatura detayı bulunamadı.</td>
+                    <td colspan="5" class="px-3 py-4 text-center text-sm text-gray-500">Fatura detayı bulunamadı.</td>
                 </tr>
             `;
         } else {
             let subtotal = 0;
-            let taxAmount = 0;
             
             detaylar.forEach(item => {
                 const total = item.miktar * item.birim_fiyat;
-                const tax = total * 0.18; // %18 KDV
                 subtotal += total;
-                taxAmount += tax;
                 
                 html += `
                     <tr class="hover:bg-gray-50">
@@ -352,8 +348,7 @@ foreach($faturalar as $fatura) {
                         <td class="px-3 py-2 text-sm text-gray-500">${item.urun_adi}</td>
                         <td class="px-3 py-2 text-sm text-gray-500 text-right">${item.miktar}</td>
                         <td class="px-3 py-2 text-sm text-gray-500 text-right">${formatCurrency(item.birim_fiyat)}</td>
-                        <td class="px-3 py-2 text-sm text-gray-500 text-right">%18</td>
-                        <td class="px-3 py-2 text-sm font-medium text-gray-900 text-right">${formatCurrency(total + tax)}</td>
+                        <td class="px-3 py-2 text-sm font-medium text-gray-900 text-right">${formatCurrency(total)}</td>
                     </tr>
                 `;
             });
@@ -365,17 +360,9 @@ foreach($faturalar as $fatura) {
             
             <div class="flex justify-end mt-4">
                 <div class="w-full sm:w-1/2 md:w-1/3 lg:w-1/4 border border-gray-200 rounded p-3 text-sm">
-                    <div class="flex justify-between py-1">
-                        <span class="text-gray-600">Ara Toplam:</span>
-                        <span class="font-medium">${formatCurrency(subtotal)}</span>
-                    </div>
-                    <div class="flex justify-between py-1">
-                        <span class="text-gray-600">KDV Tutarı:</span>
-                        <span class="font-medium">${formatCurrency(taxAmount)}</span>
-                    </div>
                     <div class="flex justify-between py-1 border-t border-gray-200 mt-2 pt-2">
                         <span class="text-gray-800 font-medium">Genel Toplam:</span>
-                        <span class="text-primary font-semibold">${formatCurrency(subtotal + taxAmount)}</span>
+                        <span class="text-primary font-semibold">${formatCurrency(subtotal)}</span>
                     </div>
                 </div>
             </div>

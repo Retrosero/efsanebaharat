@@ -2,6 +2,14 @@
 // satis_kaydet.php
 header('Content-Type: application/json; charset=utf-8');
 require_once 'includes/db.php';
+// Oturum bilgilerini kontrol et
+session_start();
+
+// Kullanıcı giriş yapmamışsa
+if (!isset($_SESSION['kullanici_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Oturum açmanız gerekiyor']);
+    exit;
+}
 
 // Hata ayıklama için
 error_log("satis_kaydet.php çağrıldı");
@@ -96,19 +104,19 @@ try {
     error_log("Transaction başlatılıyor");
     $pdo->beginTransaction();
 
-    // 3) Faturalar tablosuna ekle
-    error_log("Fatura ekleniyor");
+    // 3) Faturalar tablosuna ekle - doğrudan onaylanmış olarak işaretliyoruz
+    error_log("Fatura ekleniyor - doğrudan onaylanıyor");
     
     try {
     $stmtF = $pdo->prepare("
         INSERT INTO faturalar(
                 fatura_turu, musteri_id, toplam_tutar, odeme_durumu,
                 fatura_tarihi, kullanici_id, indirim_tutari, genel_toplam, kalan_tutar,
-                created_at
+                created_at, onay_durumu, onayli
         ) VALUES(
                 'satis', :mid, :toplam, 'odenmedi',
-                CURDATE(), 1, :iskonto, :net_toplam, :net_toplam,
-                NOW()
+                CURDATE(), :kullanici_id, :iskonto, :net_toplam, :net_toplam,
+                NOW(), 'onaylandi', 1
         )
     ");
         
@@ -116,7 +124,8 @@ try {
         ':mid' => $musteri_id,
         ':toplam' => $araToplam,
         ':iskonto' => $iskonto,
-        ':net_toplam' => $netToplam
+        ':net_toplam' => $netToplam,
+        ':kullanici_id' => $_SESSION['kullanici_id']
     ]);
         
     $fatura_id = $pdo->lastInsertId();
@@ -196,114 +205,56 @@ try {
                 ':note' => $note
             ]);
             
-            // 5) Stok güncelle - ölçüm birimi kontrolü ile
-            if ($urunOlcumBirimi === 'adet') {
-                // Adet bazlı ürünler için normal güncelleme
-                $stmtS = $pdo->prepare("
-            UPDATE urunler 
-                    SET stok_miktari = stok_miktari - :qty 
-            WHERE id = :uid
-        ");
-                
-                $stmtS->execute([
-            ':qty' => $qty,
-            ':uid' => $urun_id
-                ]);
-            } else {
-                // Ağırlık bazlı ürünler için hassas güncelleme
-                // Önce mevcut stok miktarını alalım
-                $stmtGetStock = $pdo->prepare("SELECT stok_miktari, olcum_birimi FROM urunler WHERE id = :uid");
-                $stmtGetStock->execute([':uid' => $urun_id]);
-                $stockData = $stmtGetStock->fetch(PDO::FETCH_ASSOC);
-                
-                $currentStock = floatval($stockData['stok_miktari']);
-                $stockUnit = $stockData['olcum_birimi'];
-                
-                // Satış miktarını stok birimine dönüştürelim
-                $convertedQty = floatval($qty);
-                
-                // Satış birimi olarak ürünün kendi ölçüm birimini kullanıyoruz
-                // Çünkü sepete eklerken birim dönüşümü zaten yapılmış oluyor
-                $salesUnit = $urunOlcumBirimi;
-                
-                // Gram -> Kilogram dönüşümü
-                if ($salesUnit === 'gr' && $stockUnit === 'kg') {
-                    $convertedQty = $convertedQty / 1000;
-                }
-                // Kilogram -> Gram dönüşümü
-                elseif ($salesUnit === 'kg' && $stockUnit === 'gr') {
-                    $convertedQty = $convertedQty * 1000;
-                }
-                
-                // Stok miktarını hassas bir şekilde güncelleyelim
-                $newStock = $currentStock - $convertedQty;
-                
-                // Negatif stok olmaması için kontrol
-                if ($newStock < 0) {
-                    $newStock = 0;
-                }
-                
-                // Stok miktarını güncelle - decimal değeri koruyarak ve yuvarlama yapmadan
-                if ($stockUnit === 'kg') {
-                    // Kilogram için 3 ondalık basamak hassasiyet (gram hassasiyeti)
-                    $newStock = number_format($newStock, 3, '.', ''); // round yerine number_format kullanıyoruz
-                } else {
-                    // Gram için tam sayı değeri
-                    $newStock = number_format($newStock, 0, '.', '');
-                }
-                
-                error_log("Stok güncellemesi: Ürün ID: $urun_id, Eski Stok: $currentStock $stockUnit, Satış Miktarı: $qty $urunOlcumBirimi, Dönüştürülmüş Miktar: $convertedQty $stockUnit, Hesaplanan Yeni Stok: " . ($currentStock - $convertedQty) . " $stockUnit, Formatlı Yeni Stok: $newStock $stockUnit");
-                
-                $stmtS = $pdo->prepare("
-                    UPDATE urunler 
-                    SET stok_miktari = :new_stock 
-                    WHERE id = :uid
-                ");
-                
-                $stmtS->execute([
-                    ':new_stock' => $newStock,
-                    ':uid' => $urun_id
-                ]);
-            }
-            
-            // 6) Stok hareketi ekle
-            $stmtSH = $pdo->prepare("
-                INSERT INTO stok_hareketleri(
-                    urun_id, hareket_tipi, miktar, olcum_birimi, aciklama, 
-                    fatura_id, kullanici_id, created_at
-                ) VALUES(
-                    :uid, 'cikis', :qty, :olcum_birimi, 'Satış faturası', 
-                    :fid, 1, NOW()
-                )
+            // 5) Stokları hemen güncelle
+            error_log("Stok güncelleniyor: Ürün ID: {$urun_id}, Miktar: {$qty}");
+        
+            // Ürün stoklarını azalt
+            $stmtStokGuncelle = $pdo->prepare("
+                UPDATE urunler SET stok_miktari = stok_miktari - :qty WHERE id = :uid
             ");
+            $stmtStokGuncelle->execute([':qty' => $qty, ':uid' => $urun_id]);
             
-            $stmtSH->execute([
+            // Stok hareketi ekle
+            $stmtStokHareket = $pdo->prepare("
+                INSERT INTO stok_hareketleri(
+                    urun_id, hareket_tipi, miktar, fatura_id, 
+                    kullanici_id, aciklama, created_at
+            ) VALUES(
+                    :uid, 'cikis', :qty, :fid,
+                    :kullanici_id, :aciklama, NOW()
+            )
+        ");
+            $stmtStokHareket->execute([
                 ':uid' => $urun_id,
                 ':qty' => $qty,
-                ':olcum_birimi' => $urunOlcumBirimi,
-                ':fid' => $fatura_id
+                ':fid' => $fatura_id,
+                ':kullanici_id' => $_SESSION['kullanici_id'],
+                ':aciklama' => 'Satış faturası stok çıkışı'
             ]);
         }
         
-        // 7) Müşteri bakiyesini güncelle
-        $stmtM = $pdo->prepare("
-        UPDATE musteriler
-            SET cari_bakiye = cari_bakiye + :tutar 
-        WHERE id = :mid
-    ");
+        // 6) Doğrudan cari hesaba yansıt
+        error_log("Cari hesap güncelleniyor");
         
-        $stmtM->execute([
+        // Müşteri cari bakiyesine borç olarak ekle
+        $stmtMusteri = $pdo->prepare("
+            UPDATE musteriler 
+            SET cari_bakiye = cari_bakiye + :tutar 
+            WHERE id = :musteri_id
+        ");
+        $stmtMusteri->execute([
             ':tutar' => $netToplam,
-            ':mid' => $musteri_id
+            ':musteri_id' => $musteri_id
         ]);
         
-        // İşlemi tamamla
-    $pdo->commit();
+        // Transaction tamamlandı
+        $pdo->commit();
         
-    echo json_encode([
+        echo json_encode([
             'success' => true,
-            'message' => 'Satış başarıyla kaydedildi',
-            'fatura_id' => $fatura_id
+            'message' => 'Satış başarıyla kaydedildi ve onay için gönderildi',
+            'fatura_id' => $fatura_id,
+            'redirect' => 'onay_merkezi.php'
         ]);
         
     } catch (Exception $e) {
@@ -311,14 +262,14 @@ try {
         error_log("Hata: " . $e->getMessage());
         echo json_encode([
             'success' => false,
-            'message' => 'Hata: ' . $e->getMessage()
+            'message' => 'İşlem sırasında hata oluştu: ' . $e->getMessage()
         ]);
     }
-    
 } catch (Exception $e) {
     error_log("Hata: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'message' => 'Hata: ' . $e->getMessage()
+        'message' => 'İşlem sırasında hata oluştu: ' . $e->getMessage()
     ]);
 }
+?>

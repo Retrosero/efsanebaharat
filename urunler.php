@@ -106,9 +106,11 @@ mark {
 <div class="p-0">
   <div class="max-w-full mx-auto">
     <div class="bg-white shadow-sm p-4 md:p-6">
-      <!-- Arama ve Kontroller -->
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
-        <!-- Arama Kutusu (Hem Mobil Hem Desktop için) -->
+      <!-- Arama ve Kontroller - Sabit (Fixed) -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6 sticky top-0 z-40 bg-white p-4 border-b shadow-sm mb-4">
+        <!-- Mobil Görünüm: Arama, Filtre ve Sıralama Tek Satırda -->
+        <div class="flex items-center gap-2 w-full md:w-auto">
+          <!-- Arama Kutusu -->
         <div class="relative flex-1 max-w-full md:max-w-md">
           <input 
             type="text" 
@@ -119,21 +121,21 @@ mark {
           <i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
         </div>
 
-        <!-- Mobil için Filtre ve Sıralama -->
-        <div class="flex gap-2 md:hidden">
+          <!-- Mobil için Filtre ve Sıralama İkonları -->
           <button 
             id="filterBtnMobile"
-            class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+            class="md:hidden p-2.5 flex items-center justify-center text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+            title="Filtrele"
           >
-            <i class="ri-filter-3-line"></i>
-            Filtrele
+            <i class="ri-filter-3-line text-lg"></i>
           </button>
+          
           <button 
             id="sortBtnMobile"
-            class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+            class="md:hidden p-2.5 flex items-center justify-center text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+            title="Sırala"
           >
-            <i class="ri-sort-desc"></i>
-            Sırala
+            <i class="ri-sort-desc text-lg"></i>
           </button>
         </div>
         
@@ -205,8 +207,8 @@ mark {
           </a>
         </div>
 
-        <!-- Mobil için Ürün Ekle Butonu -->
-        <div class="flex md:hidden">
+        <!-- Mobil için Ürün Ekle Butonu - Ayrı Satırda -->
+        <div class="flex md:hidden w-full">
           <a 
             href="urun_ekle.php"
             class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-white bg-primary rounded-lg hover:bg-primary/90"

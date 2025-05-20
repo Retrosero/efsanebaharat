@@ -1,8 +1,19 @@
 <?php
 // includes/header.php
 
-// Oturum başlatma kontrolü
+// Oturum başlatma kontrolü - Eğer oturum başlatılmamışsa auth.php dosyasını dahil etmeden önce başlatalım
 if (session_status() == PHP_SESSION_NONE) {
+    // Oturum başlamadan önce ayarları yapabiliriz
+    ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60); // 30 gün (saniye cinsinden)
+    ini_set('session.cookie_lifetime', 30 * 24 * 60 * 60); // 30 gün (saniye cinsinden)
+    session_name('efsanebaharat_session');
+    
+    // Oturum ve çerezlerin güvenliği için ayarlar
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
+    
+    // Oturumu başlat
     session_start();
 }
 
@@ -15,6 +26,12 @@ header("Pragma: no-cache");
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
+// Son aktivite zamanını kontrol et ve güncelle (eğer kullanıcı giriş yapmışsa)
+if (isset($_SESSION['kullanici_id'])) {
+    // Son aktivite zamanını güncelle
+    $_SESSION['son_aktivite'] = time();
+}
+
 // Giriş gerektirmeyen sayfalar
 $public_pages = ['giris.php', 'cikis.php', 'error.php'];
 
@@ -24,8 +41,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
 // Eğer sayfa public değilse ve kullanıcı giriş yapmamışsa
 if (!in_array($current_page, $public_pages)) {
     if (!isset($_SESSION['kullanici_id'])) {
-        header('Location: giris.php');
-        exit;
+        // Önce hatırlama tokenini kontrol et
+        if (!hatirlamaTokeniKontrol($pdo)) {
+            header('Location: giris.php');
+            exit;
+        }
     }
     
     // Sayfa erişim kontrolü
@@ -42,8 +62,11 @@ $exempt_pages = ['giris.php', 'cikis.php', 'error.php'];
 // Muaf sayfalar dışında oturum kontrolü yap
 if (!in_array($current_page, $exempt_pages)) {
     if (!isset($_SESSION['kullanici_id'])) {
-        header('Location: giris.php');
-        exit;
+        // Hatırlama tokenini kontrol et
+        if (!hatirlamaTokeniKontrol($pdo)) {
+            header('Location: giris.php');
+            exit;
+        }
     }
 }
 ?>
@@ -61,6 +84,12 @@ if (!in_array($current_page, $exempt_pages)) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+  
+  <!-- jQuery ve DataTables -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+  
   <style>
     :where([class^="ri-"])::before { content: "\f3c2"; }
     body { font-family: 'Inter', sans-serif; }
@@ -346,6 +375,13 @@ if (!in_array($current_page, $exempt_pages)) {
         <span>Ayarlar</span>
       </a>
       <?php endif; ?>
+
+      <?php if (sayfaErisimKontrol($pdo, 'gunsonu.php')): ?>
+      <a href="gunsonu.php" class="<?= basename($_SERVER['PHP_SELF']) == 'gunsonu.php' ? 'active' : '' ?>">
+        <i class="ri-file-chart-line"></i>
+        <span>Gün Sonu</span>
+      </a>
+      <?php endif; ?>
     </div>
     
     <div class="flex-1 overflow-y-auto">
@@ -406,14 +442,7 @@ if (!in_array($current_page, $exempt_pages)) {
         </a>
         <?php endif; ?>
         
-        <?php if (sayfaErisimKontrol($pdo, 'onay_merkezi.php')): ?>
-        <a href="onay_merkezi.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Onay Merkezi">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-check-double-line"></i>
-          </div>
-          <span class="nav-text">Onay Merkezi</span>
-        </a>
-        <?php endif; ?>
+
         
         <?php if (sayfaErisimKontrol($pdo, 'kullanicilar.php')): ?>
         <a href="kullanicilar.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Kullanıcılar">
@@ -441,6 +470,15 @@ if (!in_array($current_page, $exempt_pages)) {
           <span class="nav-text">Raporlar</span>
         </a>
         <?php endif; ?>
+
+        <?php if (sayfaErisimKontrol($pdo, 'gunsonu.php')): ?>
+        <a href="gunsonu.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Gün Sonu">
+          <div class="w-5 h-5 flex items-center justify-center">
+            <i class="ri-file-chart-line"></i>
+          </div>
+          <span class="nav-text">Gün Sonu</span>
+        </a>
+        <?php endif; ?>
         
         <?php if (sayfaErisimKontrol($pdo, 'ayarlar.php')): ?>
         <a href="ayarlar.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Ayarlar">
@@ -461,7 +499,20 @@ if (!in_array($current_page, $exempt_pages)) {
             <i class="ri-user-line"></i>
           </div>
           <div class="nav-text text-left flex-1">
-            <div class="font-medium truncate"><?php echo isset($_SESSION['kullanici_adi']) ? htmlspecialchars($_SESSION['kullanici_adi']) : 'Kullanıcı'; ?></div>
+            <div class="font-medium truncate">
+              <?php 
+              // Debug bilgisi (gerekirse)
+              // echo "<!-- Kullanıcı ID: " . ($_SESSION['kullanici_id'] ?? 'Yok') . " -->";
+              // echo "<!-- Kullanıcı Adı: " . ($_SESSION['kullanici_adi'] ?? 'Yok') . " -->";
+              
+              // Basitleştirilmiş kullanıcı adı gösterimi - artık veritabanı sorgusu yapmıyoruz
+              if (isset($_SESSION['kullanici_adi']) && !empty($_SESSION['kullanici_adi'])) {
+                  echo htmlspecialchars($_SESSION['kullanici_adi']);
+              } else {
+                  echo 'Kullanıcı';
+              }
+              ?>
+            </div>
           </div>
           <i class="ri-arrow-down-s-line nav-text"></i>
         </button>

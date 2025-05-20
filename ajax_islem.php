@@ -1,48 +1,78 @@
 <?php
 require_once 'includes/db.php';
+require_once 'guncelbakiye.php'; // Bakiye hesaplama fonksiyonları için
 
 header('Content-Type: application/json');
 
-if (!isset($_POST['islem'])) {
+// GET veya POST isteklerini işle
+$islem = isset($_POST['islem']) ? $_POST['islem'] : (isset($_GET['islem']) ? $_GET['islem'] : '');
+$id = isset($_POST['id']) ? intval($_POST['id']) : (isset($_GET['id']) ? intval($_GET['id']) : 0);
+
+if (empty($islem)) {
     echo json_encode(['success' => false, 'message' => 'İşlem belirtilmedi']);
     exit;
 }
 
-$islem = $_POST['islem'];
-$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-
 try {
     switch ($islem) {
+        case 'musteri_bakiye':
+            if ($id > 0) {
+                // Müşteri bakiyesini hesapla
+                $bakiye = hesaplaGuncelBakiye($pdo, $id);
+                echo json_encode([
+                    'success' => true,
+                    'bakiye' => $bakiye
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Geçersiz müşteri ID']);
+            }
+            break;
+            
         case 'tahsilat_sil':
             if ($id > 0) {
                 // Önce tahsilatın tutarını al
-                $stmt = $pdo->prepare("SELECT tutar, musteri_id FROM odeme_tahsilat WHERE id = ?");
+                $stmt = $pdo->prepare("SELECT tutar, musteri_id, onay_durumu FROM odeme_tahsilat WHERE id = ?");
                 $stmt->execute([$id]);
                 $tahsilat = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($tahsilat) {
                     $pdo->beginTransaction();
                     
+                    // Önce ilişkili odeme_detay kaydını sil
+                    $stmtDetay = $pdo->prepare("DELETE FROM odeme_detay WHERE odeme_id = ?");
+                    $stmtDetay->execute([$id]);
+                    
+                    // Onay işlemi tablosunda kayıt var mı kontrol et, varsa sil
+                    $stmtCheckOnay = $pdo->prepare("SELECT COUNT(*) FROM onay_islemleri WHERE islem_tipi = ? AND islem_id = ?");
+                    $stmtCheckOnay->execute(['tahsilat', $id]);
+                    if ($stmtCheckOnay->fetchColumn() > 0) {
+                        $stmtOnay = $pdo->prepare("DELETE FROM onay_islemleri WHERE islem_tipi = ? AND islem_id = ?");
+                        $stmtOnay->execute(['tahsilat', $id]);
+                    }
+                    
                     // Tahsilatı sil
                     $stmt = $pdo->prepare("DELETE FROM odeme_tahsilat WHERE id = ?");
                     $stmt->execute([$id]);
                     
-                    // Müşteri bakiyesini güncelle (tahsilat silindiği için bakiyeye ekle)
-                    $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye + ? WHERE id = ?");
-                    $stmt->execute([$tahsilat['tutar'], $tahsilat['musteri_id']]);
+                        // Müşteri bakiyesini güncelle (tahsilat silindiği için bakiyeye ekle)
+                    // Artık onay_durumu kontrolü yapmıyoruz çünkü tüm tahsilatlar direkt onaylanıyor
+                        $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye + ? WHERE id = ?");
+                        $stmt->execute([$tahsilat['tutar'], $tahsilat['musteri_id']]);
                     
                     $pdo->commit();
                     echo json_encode(['success' => true, 'message' => 'Tahsilat başarıyla silindi']);
                 } else {
                     echo json_encode(['success' => false, 'message' => 'Tahsilat bulunamadı']);
                 }
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Geçersiz tahsilat ID']);
             }
             break;
             
         case 'fatura_sil':
             if ($id > 0) {
                 // Önce faturanın bilgilerini al (tür, tutar, müşteri/tedarikçi ID)
-                $stmt = $pdo->prepare("SELECT fatura_turu, toplam_tutar, musteri_id, tedarikci_id FROM faturalar WHERE id = ?");
+                $stmt = $pdo->prepare("SELECT fatura_turu, toplam_tutar, musteri_id, tedarikci_id, onay_durumu FROM faturalar WHERE id = ?");
                 $stmt->execute([$id]);
                 $fatura = $stmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -53,19 +83,35 @@ try {
                     $stmt = $pdo->prepare("DELETE FROM fatura_detaylari WHERE fatura_id = ?");
                     $stmt->execute([$id]);
                     
+                    // Onay işlemi tablosunda kayıt var mı kontrol et, varsa sil
+                    $stmtCheckOnay = $pdo->prepare("SELECT COUNT(*) FROM onay_islemleri WHERE islem_tipi = ? AND islem_id = ?");
+                    $stmtCheckOnay->execute(['satis', $id]);
+                    if ($stmtCheckOnay->fetchColumn() > 0) {
+                        $stmtOnay = $pdo->prepare("DELETE FROM onay_islemleri WHERE islem_tipi = ? AND islem_id = ?");
+                        $stmtOnay->execute(['satis', $id]);
+                    }
+
+                    // Stok hareketlerini sil
+                    $stmt = $pdo->prepare("DELETE FROM stok_hareketleri WHERE fatura_id = ?");
+                    $stmt->execute([$id]);
+                    
                     // Faturayı sil
                     $stmt = $pdo->prepare("DELETE FROM faturalar WHERE id = ?");
                     $stmt->execute([$id]);
                     
-                    // Fatura türüne göre müşteri veya tedarikçi bakiyesini güncelle
-                    if ($fatura['fatura_turu'] == 'satis' && $fatura['musteri_id']) {
-                        // Satış faturası silindiğinde müşteri bakiyesinden düş
-                        $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye - ? WHERE id = ?");
-                        $stmt->execute([$fatura['toplam_tutar'], $fatura['musteri_id']]);
-                    } elseif ($fatura['fatura_turu'] == 'alis' && $fatura['tedarikci_id']) {
-                        // Alış faturası silindiğinde tedarikçi bakiyesine ekle
-                        $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye + ? WHERE id = ?");
-                        $stmt->execute([$fatura['toplam_tutar'], $fatura['tedarikci_id']]);
+                        // Fatura türüne göre müşteri veya tedarikçi bakiyesini güncelle
+                        if ($fatura['fatura_turu'] == 'satis' && $fatura['musteri_id']) {
+                            // Satış faturası silindiğinde müşteri bakiyesinden düş
+                            $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye - ? WHERE id = ?");
+                            $stmt->execute([$fatura['toplam_tutar'], $fatura['musteri_id']]);
+                        } elseif ($fatura['fatura_turu'] == 'alis' && $fatura['tedarikci_id']) {
+                            // Alış faturası silindiğinde tedarikçi bakiyesine ekle
+                            $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye + ? WHERE id = ?");
+                            $stmt->execute([$fatura['toplam_tutar'], $fatura['tedarikci_id']]);
+                        } elseif ($fatura['fatura_turu'] == 'alis' && $fatura['musteri_id']) {
+                            // Alış faturası (müşteriden alış) silindiğinde müşteri bakiyesine ekle
+                            $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye + ? WHERE id = ?");
+                            $stmt->execute([$fatura['toplam_tutar'], $fatura['musteri_id']]);
                     }
                     
                     $pdo->commit();
@@ -73,6 +119,8 @@ try {
                 } else {
                     echo json_encode(['success' => false, 'message' => 'Fatura bulunamadı']);
                 }
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Geçersiz fatura ID']);
             }
             break;
             

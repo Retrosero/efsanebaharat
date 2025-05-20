@@ -15,6 +15,10 @@ try {
     $musteriList = [];
 }
 
+// Kullanıcı ID ve evrak no tanımla
+$kullaniciID = $_SESSION['kullanici_id'] ?? null;
+$evrakNo = 'THS-' . date('Ymd') . '-' . rand(1000, 9999);
+
 // Form post
 $selectedMusteriID = isset($_GET['musteri_id']) ? $_GET['musteri_id'] : null;
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
@@ -43,40 +47,40 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $vade_tarihi = $_POST['senet_vade'] ?? null;
     }
 
-    if($selectedMusteriID && $tutar > 0){
+    if($selectedMusteriID && $tutar > 0 && $kullaniciID){
         try {
             $pdo->beginTransaction();
 
-            // odeme_tahsilat'a ekle
-            $stmtIns = $pdo->prepare("
-                INSERT INTO odeme_tahsilat(musteri_id, tutar, odeme_turu, islem_tarihi, aciklama, created_at)
-                VALUES(:mid, :tutar, :oy, :it, :aciklama, NOW())
+            // Tahsilat kaydı            
+            $stmtT = $pdo->prepare("
+                INSERT INTO odeme_tahsilat (
+                    islem_turu, musteri_id, tutar, odeme_turu, 
+                    aciklama, islem_tarihi, evrak_no, kullanici_id, onay_durumu, onayli
+                ) VALUES (
+                    'tahsilat', :mid, :tutar, :odeme_turu, 
+                    :aciklama, :tarih, :evrak_no, :kullanici_id, 'onaylandi', 1
+                )
             ");
-            $stmtIns->execute([
-                ':mid'   => $selectedMusteriID,
+
+            $stmtT->execute([
+                ':mid' => $selectedMusteriID,
                 ':tutar' => $tutar,
-                ':oy'    => $tahsilatTuru,
-                ':it'    => $islemTarihi,
-                ':aciklama' => $aciklama
+                ':odeme_turu' => $tahsilatTuru,
+                ':aciklama' => $aciklama,
+                ':tarih' => $islemTarihi,
+                ':evrak_no' => $evrakNo,
+                ':kullanici_id' => $kullaniciID
             ]);
 
             $odeme_id = $pdo->lastInsertId();
 
-            // Ödeme detaylarını kaydet
-            if(in_array($tahsilatTuru, ['kredi', 'havale', 'cek', 'senet'])) {
+            // Eğer çek veya senet ise detay tablosuna kaydet
+            if($tahsilatTuru === 'cek' || $tahsilatTuru === 'senet'){
                 $stmtDet = $pdo->prepare("
-                    INSERT INTO odeme_detay(
-                        odeme_id, 
-                        banka_id, 
-                        cek_senet_no, 
-                        vade_tarihi,
-                        created_at
+                    INSERT INTO odeme_detay (
+                        odeme_id, banka_id, cek_senet_no, vade_tarihi
                     ) VALUES (
-                        :odeme_id,
-                        :banka_id,
-                        :cek_senet_no,
-                        :vade_tarihi,
-                        NOW()
+                        :odeme_id, :banka_id, :cek_senet_no, :vade_tarihi
                     )
                 ");
                 $stmtDet->execute([
@@ -87,15 +91,15 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 ]);
             }
 
-            // musteriler.cari_bakiye düş
-            $stmtUp = $pdo->prepare("
-               UPDATE musteriler
-                  SET cari_bakiye = cari_bakiye - :tutar
-                WHERE id = :mid
+            // Doğrudan cari hesabı güncelle
+            $stmtCari = $pdo->prepare("
+                UPDATE musteriler 
+                SET cari_bakiye = cari_bakiye - :tutar 
+                WHERE id = :musteri_id
             ");
-            $stmtUp->execute([
+            $stmtCari->execute([
                 ':tutar' => $tutar,
-                ':mid' => $selectedMusteriID
+                ':musteri_id' => $selectedMusteriID
             ]);
 
             $pdo->commit();
@@ -105,6 +109,15 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             $pdo->rollBack();
             $errorMessage = "Kaydetme hatası: " . $ex->getMessage();
         }
+    }
+    else if (!$kullaniciID) {
+        $errorMessage = "Hata: Oturum açmış bir kullanıcı bulunamadı. Lütfen tekrar giriş yapın.";
+    }
+    else if (!$selectedMusteriID) {
+        $errorMessage = "Hata: Lütfen bir müşteri seçin.";
+    }
+    else if ($tutar <= 0) {
+        $errorMessage = "Hata: Lütfen geçerli bir tutar girin.";
     }
 }
 
