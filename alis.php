@@ -3,6 +3,20 @@
 require_once 'includes/db.php';
 include 'includes/header.php'; // Soldaki menü + top bar layout
 
+// Döviz kurlarını çek
+$dovizKurlari = [];
+try {
+    $stmtD = $pdo->query("SELECT para_birimi, alis_kuru, satis_kuru FROM doviz_kurlari");
+    while ($kur = $stmtD->fetch(PDO::FETCH_ASSOC)) {
+        $dovizKurlari[$kur['para_birimi']] = [
+            'alis' => $kur['alis_kuru'],
+            'satis' => $kur['satis_kuru']
+        ];
+    }
+} catch(Exception $e) {
+    // İlk kez çalıştırılıyorsa tablo henüz oluşturulmamış olabilir
+}
+
 // Tedarikçileri çek (musteriler tablosundan)
 $musteriRows = [];
 try {
@@ -45,6 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tarih = $_POST['tarih'] ?? date('Y-m-d');
     $iskonto_oran = isset($_POST['iskonto_oran']) ? floatval($_POST['iskonto_oran']) : 0;
     $iskonto_tutar = isset($_POST['iskonto_tutar']) ? floatval($_POST['iskonto_tutar']) : 0;
+    $para_birimi = $_POST['para_birimi'] ?? 'TRY';
+    $doviz_kuru = $para_birimi != 'TRY' ? floatval($_POST['doviz_kuru']) : 1.0;
     
     // Ürün detayları
     $urun_idler = $_POST['urun_id'] ?? [];
@@ -79,11 +95,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             INSERT INTO faturalar (
                 fatura_turu, musteri_id, toplam_tutar, 
                 odeme_durumu, fatura_tarihi, kullanici_id,
-                indirim_tutari, genel_toplam, kalan_tutar
+                indirim_tutari, genel_toplam, kalan_tutar,
+                para_birimi, doviz_kuru
             ) VALUES (
                 'alis', :musteri_id, :toplam_tutar, 
                 'odenmedi', :tarih, :kullanici_id,
-                :indirim_tutari, :genel_toplam, :kalan_tutar
+                :indirim_tutari, :genel_toplam, :kalan_tutar,
+                :para_birimi, :doviz_kuru
             )
         ");
         
@@ -94,7 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':kullanici_id' => 1, // Varsayılan kullanıcı ID
             ':indirim_tutari' => $iskonto_tutari,
             ':genel_toplam' => $toplam_tutar, // İndirim sonrası toplam
-            ':kalan_tutar' => $toplam_tutar // Başlangıçta kalan tutar = genel toplam
+            ':kalan_tutar' => $toplam_tutar, // Başlangıçta kalan tutar = genel toplam
+            ':para_birimi' => $para_birimi,
+            ':doviz_kuru' => $doviz_kuru
         ]);
         
         $fatura_id = $pdo->lastInsertId();
@@ -168,6 +188,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Müşteri bakiyesini güncelle (alış faturası oluşturuldu)
+        if ($para_birimi == 'TRY') {
+            // TL cinsinden bakiye güncelleme
         $stmtMusteriGuncelle = $pdo->prepare("
             UPDATE musteriler 
             SET cari_bakiye = cari_bakiye - :toplam_tutar 
@@ -177,6 +199,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':toplam_tutar' => $toplam_tutar,
             ':musteri_id' => $musteri_id
         ]);
+        } else {
+            // Döviz cinsinden bakiye güncelleme
+            $doviz_sutunu = strtolower($para_birimi) . '_bakiye';
+            $stmtMusteriGuncelle = $pdo->prepare("
+                UPDATE musteriler 
+                SET $doviz_sutunu = $doviz_sutunu - :toplam_tutar 
+                WHERE id = :musteri_id
+            ");
+            $stmtMusteriGuncelle->execute([
+                ':toplam_tutar' => $toplam_tutar,
+                ':musteri_id' => $musteri_id
+            ]);
+        }
         
         // İşlem başarılı olduğunda log tutma
         error_log("Alış faturası eklendi: ID=$fatura_id, Tutar=$toplam_tutar, Müşteri ID=$musteri_id");
@@ -228,9 +263,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   <?php endif; ?>
 
-  <form method="post" id="alisFaturaForm" class="bg-white rounded-lg shadow-sm p-4">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <!-- Müşteri Seçimi -->
+  <div class="bg-white rounded-lg shadow p-6">
+    <form method="POST" id="alisForm">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Müşteri seçimi -->
       <div>
         <label for="musteri_search" class="block text-sm font-medium text-gray-700 mb-1">Müşteri Ara</label>
         <div class="relative">
@@ -270,6 +306,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           required
         >
       </div>
+
+        <!-- Para birimi seçimi -->
+        <div>
+          <label for="para_birimi" class="block text-sm font-medium text-gray-700 mb-1">Para Birimi</label>
+          <select 
+            id="para_birimi" 
+            name="para_birimi" 
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onchange="parabirimiDegisti(this.value)"
+          >
+            <option value="TRY">Türk Lirası (₺)</option>
+            <option value="USD">Amerikan Doları ($)</option>
+            <option value="EUR">Euro (€)</option>
+            <option value="GBP">İngiliz Sterlini (£)</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- Döviz kuru alanı -->
+      <div id="doviz_kuru_alani" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6" style="display: none;">
+        <div>
+          <label for="doviz_kuru" class="block text-sm font-medium text-gray-700 mb-1">
+            Döviz Kuru <span class="text-xs text-gray-500">(1 birim döviz kaç TL)</span>
+          </label>
+          <div class="flex">
+            <input 
+              type="number" 
+              id="doviz_kuru" 
+              name="doviz_kuru" 
+              step="0.0001" 
+              min="0.0001" 
+              class="w-full px-4 py-2 border rounded-l-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              value="<?= $dovizKurlari['USD']['alis'] ?? '30.5000' ?>"
+            >
+            <button 
+              type="button" 
+              onclick="guncelKuruAl()" 
+              class="px-4 py-2 bg-gray-100 border border-l-0 rounded-r-lg hover:bg-gray-200"
+              title="Varsayılan kuru kullan"
+            >
+              <i class="ri-refresh-line"></i>
+            </button>
+          </div>
+        </div>
     </div>
 
     <!-- Ürün Tablosu -->
@@ -394,6 +474,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </button>
     </div>
   </form>
+  </div>
 </div>
 
 <script>
@@ -668,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Form gönderilmeden önce kontrol
-  document.getElementById('alisFaturaForm').addEventListener('submit', function(e) {
+  document.getElementById('alisForm').addEventListener('submit', function(e) {
     const musteriId = document.getElementById('musteri_id').value;
     
     if (!musteriId) {
@@ -691,6 +772,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 });
+
+// Döviz kurları
+const dovizKurlari = <?= !empty($dovizKurlari) ? json_encode($dovizKurlari) : '{"USD":{"alis":30.5000,"satis":30.7000},"EUR":{"alis":32.4000,"satis":32.6000},"GBP":{"alis":38.1000,"satis":38.3000}}' ?>;
+
+// Para birimi değiştiğinde
+function parabirimiDegisti(birim) {
+  const kurAlani = document.getElementById('doviz_kuru_alani');
+  const kurInput = document.getElementById('doviz_kuru');
+  
+  if (birim === 'TRY') {
+    kurAlani.style.display = 'none';
+    kurInput.value = '1';
+  } else {
+    kurAlani.style.display = 'grid';
+    kurInput.value = dovizKurlari[birim]?.alis || '1.0000';
+  }
+}
+
+// Güncel kuru al
+function guncelKuruAl() {
+  const birim = document.getElementById('para_birimi').value;
+  const kurInput = document.getElementById('doviz_kuru');
+  
+  if (birim !== 'TRY' && dovizKurlari[birim]) {
+    kurInput.value = dovizKurlari[birim].alis;
+  }
+}
 </script>
 
 <?php include 'includes/footer.php'; ?> 

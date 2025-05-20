@@ -38,8 +38,14 @@ if (!$id) {
 
 // SQL sorgusunu kontrol et
 try {
-$stmt = $pdo->prepare("SELECT * FROM musteriler WHERE id = :id");
-$stmt->execute([':id' => $id]);
+    $stmt = $pdo->prepare("
+        SELECT m.*, 
+               mt.tip_adi as musteri_tipi_adi
+        FROM musteriler m
+        LEFT JOIN musteri_tipleri mt ON m.tip_id = mt.id
+        WHERE m.id = ?
+    ");
+    $stmt->execute([$id]);
 $musteri = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$musteri) {
@@ -72,6 +78,18 @@ $vergiNo    = $musteri['vergi_no'];
 $vergiDairesi = $musteri['vergi_dairesi'];
 $hesapAcilis = date('d.m.Y', strtotime($musteri['created_at']));
 
+// Bakiyeler
+$cariBakiye = hesaplaGuncelBakiye($pdo, $musteri['id']);
+$cariBakiyeFormatted = number_format($cariBakiye, 2, ',', '.');
+
+// Döviz bakiyelerini güncelle
+guncelleDovizbakiyeleri($pdo, $musteri['id']);
+
+// Güncellenmiş döviz bakiyelerini çek
+$usdBakiye = $musteri['usd_bakiye'] ?? 0;
+$eurBakiye = $musteri['eur_bakiye'] ?? 0;
+$gbpBakiye = $musteri['gbp_bakiye'] ?? 0;
+
 // Dinamik Cari Bakiye (Satış - Tahsilat)
 function getMusteriCariBakiye($pdo, $musteri_id){
     // Toplam satış
@@ -97,8 +115,6 @@ function getMusteriCariBakiye($pdo, $musteri_id){
 
     return $toplamSatis - $toplamTahsilat;
 }
-$cariBakiye = hesaplaGuncelBakiye($pdo, $musteri['id']);
-$cariBakiyeFormatted = number_format($cariBakiye, 2, ',', '.');
 
 // Ciro bilgisi için fonksiyonlar
 function getMusteriCiroYillik($pdo, $musteri_id, $yil) {
@@ -249,6 +265,7 @@ try {
       SELECT 
         f.id AS rec_id,
         f.toplam_tutar AS tutar,
+        f.para_birimi,
         'Satış' AS odeme_yontemi,
         f.aciklama,
         f.fatura_tarihi AS islem_tarihi,
@@ -263,6 +280,7 @@ try {
       SELECT 
         f.id AS rec_id,
         f.toplam_tutar AS tutar,
+        f.para_birimi,
         'Alış' AS odeme_yontemi,
         f.aciklama,
         f.fatura_tarihi AS islem_tarihi,
@@ -277,6 +295,7 @@ try {
       SELECT
         o.id AS rec_id,
         o.tutar AS tutar,
+        'TRY' AS para_birimi,
         CASE 
           WHEN o.odeme_turu = 'nakit' THEN 'Nakit'
           WHEN o.odeme_turu = 'kredi' THEN 'Kredi Kartı'
@@ -380,7 +399,24 @@ try {
         <div class="text-xl sm:text-2xl font-bold text-primary">
           ₺<?= $cariBakiyeFormatted ?>
         </div>
-        <p class="text-xs sm:text-sm text-gray-600">Satış - Alış - Tahsilat ile hesaplanır</p>
+        <p class="text-xs sm:text-sm text-gray-600 mb-2">TL cinsinden cari bakiye</p>
+        
+        <!-- Döviz Bakiyeleri -->
+        <div class="mt-2 pt-2 border-t border-gray-200">
+          <h4 class="font-medium text-sm mb-1">Döviz Bakiyeleri</h4>
+          <div class="flex justify-between items-center">
+            <span class="text-xs">USD:</span>
+            <span class="font-medium <?= $usdBakiye < 0 ? 'text-red-600' : 'text-green-600' ?>">$<?= number_format($usdBakiye, 2, ',', '.') ?></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-xs">EUR:</span>
+            <span class="font-medium <?= $eurBakiye < 0 ? 'text-red-600' : 'text-green-600' ?>">€<?= number_format($eurBakiye, 2, ',', '.') ?></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-xs">GBP:</span>
+            <span class="font-medium <?= $gbpBakiye < 0 ? 'text-red-600' : 'text-green-600' ?>">£<?= number_format($gbpBakiye, 2, ',', '.') ?></span>
+          </div>
+        </div>
       </div>
       
       <!-- Ciro Bilgisi (Yeni Eklenen) -->
@@ -555,6 +591,7 @@ try {
               <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
               <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
               <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evrak Tipi</th>
+              <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Para Birimi</th>
               <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Açıklama</th>
               <th class="px-2 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tutar</th>
             </tr>
@@ -569,19 +606,32 @@ try {
               $tutarPrefix = $hareket['tur'] === 'Satis' ? '-' : '+';
               $detayUrl = $hareket['tur'] === 'Satis' ? "fatura_detay.php?id={$hareket['rec_id']}" : 
                          ($hareket['tur'] === 'Alis' ? "fatura_detay.php?id={$hareket['rec_id']}" : "tahsilat_detay.php?id={$hareket['rec_id']}");
+              
+              // Para birimi sembollerini ekle
+              $paraBirimiSembol = '₺';
+              if ($hareket['para_birimi'] === 'USD') $paraBirimiSembol = '$';
+              else if ($hareket['para_birimi'] === 'EUR') $paraBirimiSembol = '€';
+              else if ($hareket['para_birimi'] === 'GBP') $paraBirimiSembol = '£';
+              
+              // Para birimi metni
+              $paraBirimiText = 'Türk Lirası';
+              if ($hareket['para_birimi'] === 'USD') $paraBirimiText = 'Amerikan Doları';
+              else if ($hareket['para_birimi'] === 'EUR') $paraBirimiText = 'Euro';
+              else if ($hareket['para_birimi'] === 'GBP') $paraBirimiText = 'İngiliz Sterlini';
             ?>
             <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='<?= $detayUrl ?>'">
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= $islemTarihi ?></td>
               <td class="px-2 sm:px-4 py-2 text-sm font-medium"><?= $islemTuru ?></td>
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= htmlspecialchars($hareket['odeme_yontemi']) ?></td>
+              <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= $paraBirimiText ?> (<?= $paraBirimiSembol ?>)</td>
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= htmlspecialchars($hareket['aciklama']) ?></td>
-              <td class="px-2 sm:px-4 py-2 text-sm font-medium <?= $tutarClass ?> text-right"><?= $tutarPrefix ?> <?= $tutarFormatted ?> ₺</td>
+              <td class="px-2 sm:px-4 py-2 text-sm font-medium <?= $tutarClass ?> text-right"><?= $tutarPrefix ?><?= $tutarFormatted ?> <?= $paraBirimiSembol ?></td>
             </tr>
             <?php endforeach; ?>
             
             <?php if(empty($hesapHareketleri)): ?>
             <tr>
-              <td colspan="4" class="px-2 sm:px-4 py-2 text-sm text-gray-500 text-center">Henüz hesap hareketi bulunmuyor.</td>
+              <td colspan="6" class="px-2 sm:px-4 py-2 text-sm text-gray-500 text-center">Henüz hesap hareketi bulunmuyor.</td>
             </tr>
             <?php endif; ?>
           </tbody>

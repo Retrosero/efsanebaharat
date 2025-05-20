@@ -7,7 +7,7 @@ include 'includes/header.php'; // Soldaki menü + top bar layout
 $customerRows = [];
 try {
   // Müşterileri alfabetik sıraya göre getir (ad ve soyad'a göre)
-  $stmtC = $pdo->query("SELECT id, ad, soyad, cari_bakiye FROM musteriler ORDER BY ad ASC, soyad ASC");
+  $stmtC = $pdo->query("SELECT id, ad, soyad, cari_bakiye, usd_bakiye, eur_bakiye, gbp_bakiye FROM musteriler ORDER BY ad ASC, soyad ASC");
   $customerRows = $stmtC->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e) {
   // ignore
@@ -835,11 +835,9 @@ function loadFilterStateFromLocalStorage() {
 // --- End localStorage Functions ---
 
 // Sayfa yüklendiğinde
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
   // Verilerini JavaScript'e aktar
   const productsFromDB = <?= $urunlerJson ?>;
-  // Initialize with empty array then fetch later
-  const customersFromDB = [];
   
   // Current cart state
   let cart = [];
@@ -854,8 +852,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // Filtered products
   let filteredProducts = [...productsFromDB];
   
-  // Ürünleri göster
+    // Verileri yükle
+    loadCartFromLocalStorage();
+    loadDiscountRateFromLocalStorage();
+    loadOrderNoteFromLocalStorage();
+    loadFilterStateFromLocalStorage();
+
+    // Ürün Filtreleme ve Görüntüleme
+    initEvents();
+    filterAndRenderProducts();
   renderProducts();
+    updateCartCount();
+    renderCart();
   
   // Kategori seçildiğinde olayını ekle
   document.querySelectorAll('.category-btn').forEach(btn => {
@@ -870,44 +878,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (customerSearch) {
     customerSearch.addEventListener('input', filterCustomers);
   }
+    
+    // Müşteri Araması ve Listesi
+    renderCustomerList();
   
   // Yeni müşteri arama dropdown için event listener
   const customerSearchDropdown = document.getElementById('customerSearchDropdown');
   if (customerSearchDropdown) {
-    customerSearchDropdown.addEventListener('input', function() {
-      filterCustomersDropdown(this.value.trim());
-    });
-    
-    customerSearchDropdown.addEventListener('focus', function() {
-      document.getElementById('customerDropdown').classList.remove('hidden');
-      // İlk açılışta tüm müşterileri göster
-      filterCustomersDropdown('');
-    });
-    
-    // Dropdown dışına tıklanınca kapanması için
-    document.addEventListener('click', function(e) {
-      const dropdown = document.getElementById('customerDropdown');
-      if (!dropdown) return;
-      
-      if (!dropdown.contains(e.target) && e.target !== customerSearchDropdown) {
-        dropdown.classList.add('hidden');
-      }
-    });
-  }
-
-  loadCartFromLocalStorage();
-  loadDiscountRateFromLocalStorage();
-  loadOrderNoteFromLocalStorage();
-  loadFilterStateFromLocalStorage();
-
-  initEvents();
-  // İlk yüklemede filtreleri uygula
-  filterAndRenderProducts(); // This will call renderProducts
-  renderCustomerList();
-  updateCartCount(); // Update count based on loaded cart
-  renderCart();      // Render the loaded cart and calculate totals
+        // Önceki event listener'ları kaldır
+        customerSearchDropdown.removeEventListener('input', filterCustomersDropdownHandler);
+        customerSearchDropdown.removeEventListener('focus', focusDropdownHandler);
+        
+        // Yeni event listener'ları ekle
+        customerSearchDropdown.addEventListener('input', filterCustomersDropdownHandler);
+        customerSearchDropdown.addEventListener('focus', focusDropdownHandler);
+    }
   
-  // Net Tutar toggle işlevi - yukarı doğru açılacak şekilde güncellendi
+    // Net Tutar toggle işlevi
   const netTutarToggle = document.getElementById('netTutarToggle');
   const netTutarArrow = document.getElementById('netTutarArrow');
   const cartDetailSection = document.getElementById('cartDetailSection');
@@ -934,7 +921,41 @@ document.addEventListener('DOMContentLoaded', () => {
   if (customerModalCloseBtn) {
     customerModalCloseBtn.onclick = closeCustomerModal;
   }
+    
+    // Dropdown dışına tıklanınca kapanması için
+    document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('customerDropdown');
+        if (!dropdown) return;
+        
+        const searchDropdown = document.getElementById('customerSearchDropdown');
+        if (!dropdown.contains(e.target) && e.target !== searchDropdown) {
+            dropdown.classList.add('hidden');
+        }
+    });
 });
+
+// Müşteri arama işleyicisi
+function filterCustomersDropdownHandler(e) {
+    const searchValue = e.target.value.trim();
+    const dropdown = document.getElementById('customerDropdown');
+    
+    // Input değeri boş değilse dropdown'ı göster
+    if (dropdown) {
+        dropdown.classList.remove('hidden');
+        // Arama sonuçlarını filtrele ve göster
+        filterCustomersDropdown(searchValue);
+    }
+}
+
+// Focus işleyicisi
+function focusDropdownHandler() {
+    const dropdown = document.getElementById('customerDropdown');
+    if (dropdown) {
+        dropdown.classList.remove('hidden');
+        // İlk açılışta tüm müşterileri göster
+        filterCustomersDropdown('');
+    }
+}
 
 function initEvents(){
   // Arama
@@ -1046,9 +1067,14 @@ function renderCustomerList(lst=customersFromDB){
       class="block w-full text-left p-3 hover:bg-gray-50 rounded-lg border-b border-gray-100"
     >
       <div class="font-medium">${m.ad} ${m.soyad||''}</div>
-      <div class="text-sm text-gray-500">Bakiye: ${parseFloat(m.cari_bakiye).toLocaleString('tr-TR')} ₺</div>
+      <div class="text-sm text-gray-500" id="customerBalance_${m.id}">Bakiye yükleniyor...</div>
     </button>
   `).join('');
+  
+  // Bakiye bilgisini AJAX ile getir
+  lst.forEach(m => {
+    fetchCustomerBalance(m.id);
+  });
 }
 
 function toggleCustomerModal(){
@@ -1091,8 +1117,11 @@ function selectCustomer(id){
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Güncel bakiye değerini müşteri nesnesine ata
-        found.cari_bakiye = data.bakiye;
+        // Güncel bakiye değerlerini müşteri nesnesine ata
+        found.cari_bakiye = data.try_bakiye;
+        found.usd_bakiye = data.usd_bakiye;
+        found.eur_bakiye = data.eur_bakiye;
+        found.gbp_bakiye = data.gbp_bakiye;
         // Bakiye gösterimini güncelle
         updateCustomerBalance();
       }
@@ -1656,19 +1685,38 @@ function updateCustomerBalance() {
   const selectedCustomerNameDetail = document.getElementById('selectedCustomerNameDetail');
   
   if (selectedCustomer && selectedCustomer.id) {
+    // TRY bakiye
     const bakiye = parseFloat(selectedCustomer.cari_bakiye) || 0;
     
-    // Bakiye göster
-    if (balanceElement) balanceElement.textContent = formatCurrency(bakiye);
+    // Bakiye HTML hazırla
+    let bakiyeHtml = `<div class="${bakiye < 0 ? 'text-green-500' : (bakiye > 0 ? 'text-red-500' : 'text-gray-500')}">
+      TRY: ${formatCurrency(bakiye)}
+    </div>`;
     
-    // Bakiye renk ayarı
-    if (balanceElement) {
-    if (bakiye < 0) {
-        balanceElement.className = 'text-xs font-medium text-red-500';
-  } else {
-        balanceElement.className = 'text-xs font-medium text-green-500';
-      }
+    // Döviz bakiyelerini ekle (varsa)
+    if (selectedCustomer.usd_bakiye && selectedCustomer.usd_bakiye !== 0) {
+      const usdBakiye = parseFloat(selectedCustomer.usd_bakiye);
+      bakiyeHtml += `<div class="${usdBakiye < 0 ? 'text-green-500' : (usdBakiye > 0 ? 'text-red-500' : 'text-gray-500')}">
+        USD: ${Math.abs(usdBakiye).toLocaleString('tr-TR', {minimumFractionDigits: 2})} $
+      </div>`;
     }
+    
+    if (selectedCustomer.eur_bakiye && selectedCustomer.eur_bakiye !== 0) {
+      const eurBakiye = parseFloat(selectedCustomer.eur_bakiye);
+      bakiyeHtml += `<div class="${eurBakiye < 0 ? 'text-green-500' : (eurBakiye > 0 ? 'text-red-500' : 'text-gray-500')}">
+        EUR: ${Math.abs(eurBakiye).toLocaleString('tr-TR', {minimumFractionDigits: 2})} €
+      </div>`;
+    }
+    
+    if (selectedCustomer.gbp_bakiye && selectedCustomer.gbp_bakiye !== 0) {
+      const gbpBakiye = parseFloat(selectedCustomer.gbp_bakiye);
+      bakiyeHtml += `<div class="${gbpBakiye < 0 ? 'text-green-500' : (gbpBakiye > 0 ? 'text-red-500' : 'text-gray-500')}">
+        GBP: ${Math.abs(gbpBakiye).toLocaleString('tr-TR', {minimumFractionDigits: 2})} £
+      </div>`;
+    }
+    
+    // Bakiye HTML'i göster
+    if (balanceElement) balanceElement.innerHTML = bakiyeHtml;
     
     // Müşteri adını detay alanına ekle
     if (selectedCustomerNameDetail) {
@@ -1683,8 +1731,7 @@ function updateCustomerBalance() {
   } else {
     // Müşteri seçilmedi - varsayılan değerler
     if (balanceElement) {
-    balanceElement.textContent = '0,00 ₺';
-      balanceElement.className = 'text-xs font-medium text-gray-500';
+      balanceElement.innerHTML = '<div class="text-gray-500">0,00 ₺</div>';
     }
     
     // Müşteri seçilmedi view'a geç
@@ -2446,7 +2493,20 @@ function fetchCustomerBalance(customerId) {
       if (data.success) {
         const balanceDisplay = document.getElementById(`customerBalance_${customerId}`);
         if (balanceDisplay) {
-          balanceDisplay.textContent = `Bakiye: ${parseFloat(data.bakiye).toLocaleString('tr-TR')} ₺`;
+          let bakiyeHtml = `<div>TRY: ${parseFloat(data.try_bakiye).toLocaleString('tr-TR')} ₺</div>`;
+          
+          // Döviz bakiyelerini göster (yalnızca sıfırdan farklı olanları)
+          if (data.usd_bakiye && data.usd_bakiye !== 0) {
+            bakiyeHtml += `<div>USD: ${parseFloat(data.usd_bakiye).toLocaleString('tr-TR')} $</div>`;
+          }
+          if (data.eur_bakiye && data.eur_bakiye !== 0) {
+            bakiyeHtml += `<div>EUR: ${parseFloat(data.eur_bakiye).toLocaleString('tr-TR')} €</div>`;
+          }
+          if (data.gbp_bakiye && data.gbp_bakiye !== 0) {
+            bakiyeHtml += `<div>GBP: ${parseFloat(data.gbp_bakiye).toLocaleString('tr-TR')} £</div>`;
+          }
+          
+          balanceDisplay.innerHTML = bakiyeHtml;
         }
       }
     })
@@ -2505,16 +2565,37 @@ function filterCustomersDropdown(searchTerm = '') {
   if (filteredCustomers.length === 0) {
     dropdownList.innerHTML = '<div class="px-4 py-2 text-sm text-gray-500">Müşteri bulunamadı</div>';
   } else {
-    dropdownList.innerHTML = filteredCustomers.map(customer => `
+    dropdownList.innerHTML = filteredCustomers.map(customer => {
+      // TRY bakiyesini formatla
+      const tryBakiye = parseFloat(customer.cari_bakiye) || 0;
+      let bakiyeHtml = `<div>TRY: ${tryBakiye.toLocaleString('tr-TR')} ₺</div>`;
+      
+      // Döviz bakiyelerini ekle (varsa)
+      if (customer.usd_bakiye && parseFloat(customer.usd_bakiye) !== 0) {
+        bakiyeHtml += `<div>USD: ${parseFloat(customer.usd_bakiye).toLocaleString('tr-TR')} $</div>`;
+      }
+      if (customer.eur_bakiye && parseFloat(customer.eur_bakiye) !== 0) {
+        bakiyeHtml += `<div>EUR: ${parseFloat(customer.eur_bakiye).toLocaleString('tr-TR')} €</div>`;
+      }
+      if (customer.gbp_bakiye && parseFloat(customer.gbp_bakiye) !== 0) {
+        bakiyeHtml += `<div>GBP: ${parseFloat(customer.gbp_bakiye).toLocaleString('tr-TR')} £</div>`;
+      }
+      
+      return `
       <div 
         class="px-4 py-2 hover:bg-gray-100 cursor-pointer" 
         onclick="selectCustomerFromDropdown(${customer.id})"
       >
         <div class="text-sm font-medium">${customer.ad} ${customer.soyad || ''}</div>
-        <div class="text-xs text-gray-500">Bakiye: ${parseFloat(customer.cari_bakiye).toLocaleString('tr-TR')} ₺</div>
+          <div class="text-xs text-gray-500">${bakiyeHtml}</div>
       </div>
-    `).join('');
+      `;
+    }).join('');
   }
+  
+  // NOT: Bu kısım her keystrokes'da tüm müşteri bakiyelerini çekiyordu ve sonsuz döngüye giriyordu.
+  // İlk yüklemede bir kez çekip saklayacağız, her keystroke'ta değil.
+  // Böylece arama işleminde performans sorunları olmayacak.
 }
 
 function selectCustomerFromDropdown(customerId) {
@@ -2524,34 +2605,31 @@ function selectCustomerFromDropdown(customerId) {
   // Dropdown'ı gizle
   document.getElementById('customerDropdown').classList.add('hidden');
   document.getElementById('customerSearchDropdown').value = '';
-}
-
-function clearSelectedCustomer() {
-  selectedCustomer = null;
-  updateCustomerBalance(); // Gösterimi güncelle
   
-  // Görünümü değiştir
-  document.getElementById('noCustomerSelected').classList.remove('hidden');
-  document.getElementById('customerSelectedInfo').classList.add('hidden');
-  
-  // Arama kutusunu temizle
-  document.getElementById('customerSearchDropdown').value = '';
+  // Seçilen müşterinin adını arama kutusuna yaz
+  const found = customersFromDB.find(x => x.id == customerId);
+  if (found) {
+    document.getElementById('customerSearchDropdown').value = `${found.ad} ${found.soyad || ''}`;
+  }
 }
 
 // Event listener'ları eklemek için DOMContentLoaded'a eklemeler
 document.addEventListener('DOMContentLoaded', () => {
-  // ... mevcut kodlar ...
-  
   // Yeni müşteri arama dropdown için event listener
   const customerSearchDropdown = document.getElementById('customerSearchDropdown');
   if (customerSearchDropdown) {
     customerSearchDropdown.addEventListener('input', function() {
-      filterCustomersDropdown(this.value.trim());
+      // Input değeri boş değilse dropdown'ı göster
       document.getElementById('customerDropdown').classList.remove('hidden');
+      
+      // Arama sonuçlarını filtrele ve göster
+      filterCustomersDropdown(this.value.trim());
     });
     
     customerSearchDropdown.addEventListener('focus', function() {
+      // Input'a focus olduğunda dropdown'ı göster
       document.getElementById('customerDropdown').classList.remove('hidden');
+      
       // İlk açılışta tüm müşterileri göster
       filterCustomersDropdown('');
     });
@@ -2566,9 +2644,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  
-  // ... mevcut kodlar ...
 });
+
+function clearSelectedCustomer() {
+  selectedCustomer = null;
+  updateCustomerBalance(); // Gösterimi güncelle
+  
+  // Görünümü değiştir
+  document.getElementById('noCustomerSelected').classList.remove('hidden');
+  document.getElementById('customerSelectedInfo').classList.add('hidden');
+  
+  // Arama kutusunu temizle
+  document.getElementById('customerSearchDropdown').value = '';
+}
 </script>
 
 <!-- Bottom Navigation - Sadece Mobil Görünümde -->

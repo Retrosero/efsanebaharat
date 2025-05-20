@@ -6,10 +6,19 @@ include 'includes/header.php';
 $selectedDate = isset($_GET['tarih']) ? $_GET['tarih'] : date('Y-m-d');
 
 try {
+    // Para birimleri
+    $paraBirimleri = ['TRY', 'USD', 'EUR', 'GBP'];
+    
+    // Her para birimi için toplamları tutacak diziler
+    $satisToplam = ['TRY' => 0, 'USD' => 0, 'EUR' => 0, 'GBP' => 0];
+    $alisToplam = ['TRY' => 0, 'USD' => 0, 'EUR' => 0, 'GBP' => 0];
+    $tahsilatToplam = ['TRY' => 0, 'USD' => 0, 'EUR' => 0, 'GBP' => 0];
+    $odemeToplam = ['TRY' => 0, 'USD' => 0, 'EUR' => 0, 'GBP' => 0];
+    
     // Satış Faturaları
     $stmtSatis = $pdo->prepare("
         SELECT f.*, m.ad as musteri_ad, m.soyad as musteri_soyad,
-               k.kullanici_adi as kaydeden
+               k.kullanici_adi as kaydeden, f.para_birimi
         FROM faturalar f
         LEFT JOIN musteriler m ON f.musteri_id = m.id
         LEFT JOIN kullanicilar k ON f.kullanici_id = k.id
@@ -23,7 +32,7 @@ try {
     // Alış Faturaları
     $stmtAlis = $pdo->prepare("
         SELECT f.*, t.firma_adi as tedarikci_ad,
-               k.kullanici_adi as kaydeden
+               k.kullanici_adi as kaydeden, f.para_birimi
         FROM faturalar f
         LEFT JOIN tedarikciler t ON f.tedarikci_id = t.id
         LEFT JOIN kullanicilar k ON f.kullanici_id = k.id
@@ -37,7 +46,7 @@ try {
     // Tahsilatlar
     $stmtTahsilat = $pdo->prepare("
         SELECT ot.*, m.ad as musteri_ad, m.soyad as musteri_soyad,
-               k.kullanici_adi as kaydeden
+               k.kullanici_adi as kaydeden, 'TRY' as para_birimi
         FROM odeme_tahsilat ot
         LEFT JOIN musteriler m ON ot.musteri_id = m.id
         LEFT JOIN kullanicilar k ON ot.kullanici_id = k.id
@@ -51,7 +60,7 @@ try {
     // Ödemeler (Tediye)
     $stmtOdeme = $pdo->prepare("
         SELECT ot.*, t.firma_adi as tedarikci_ad,
-               k.kullanici_adi as kaydeden
+               k.kullanici_adi as kaydeden, 'TRY' as para_birimi
         FROM odeme_tahsilat ot
         LEFT JOIN tedarikciler t ON ot.tedarikci_id = t.id
         LEFT JOIN kullanicilar k ON ot.kullanici_id = k.id
@@ -62,16 +71,47 @@ try {
     $stmtOdeme->execute([$selectedDate]);
     $odemeler = $stmtOdeme->fetchAll(PDO::FETCH_ASSOC);
 
-    // Toplamları Hesapla
-    $satisToplam = array_sum(array_column($satislar, 'genel_toplam'));
-    $alisToplam = array_sum(array_column($alislar, 'genel_toplam'));
-    $tahsilatToplam = array_sum(array_column($tahsilatlar, 'tutar'));
-    $odemeToplam = array_sum(array_column($odemeler, 'tutar'));
+    // Para birimine göre toplamları hesapla
+    foreach ($satislar as $satis) {
+        $paraBirimi = $satis['para_birimi'] ?? 'TRY';
+        if (isset($satisToplam[$paraBirimi])) {
+            $satisToplam[$paraBirimi] += $satis['genel_toplam'];
+        }
+    }
+    
+    foreach ($alislar as $alis) {
+        $paraBirimi = $alis['para_birimi'] ?? 'TRY';
+        if (isset($alisToplam[$paraBirimi])) {
+            $alisToplam[$paraBirimi] += $alis['genel_toplam'];
+        }
+    }
+    
+    foreach ($tahsilatlar as $tahsilat) {
+        $paraBirimi = $tahsilat['para_birimi'] ?? 'TRY'; 
+        if (isset($tahsilatToplam[$paraBirimi])) {
+            $tahsilatToplam[$paraBirimi] += $tahsilat['tutar'];
+        }
+    }
+    
+    foreach ($odemeler as $odeme) {
+        $paraBirimi = $odeme['para_birimi'] ?? 'TRY';
+        if (isset($odemeToplam[$paraBirimi])) {
+            $odemeToplam[$paraBirimi] += $odeme['tutar'];
+        }
+    }
 
 } catch(PDOException $e) {
     echo "Hata: " . $e->getMessage();
     exit;
 }
+
+// Para birimi sembollerini tanımla
+$paraBirimiSembolleri = [
+    'TRY' => '₺',
+    'USD' => '$',
+    'EUR' => '€',
+    'GBP' => '£'
+];
 ?>
 
 <div class="p-4 sm:p-6">
@@ -98,7 +138,12 @@ try {
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-500">Toplam Satış</p>
-                    <p class="text-xl font-bold text-gray-800"><?= number_format($satisToplam, 2, ',', '.') ?> ₺</p>
+                    <p class="text-xl font-bold text-gray-800"><?= number_format($satisToplam['TRY'], 2, ',', '.') ?> ₺</p>
+                    <?php foreach(['USD', 'EUR', 'GBP'] as $para_birimi): ?>
+                        <?php if($satisToplam[$para_birimi] > 0): ?>
+                            <p class="text-sm text-gray-600"><?= number_format($satisToplam[$para_birimi], 2, ',', '.') ?> <?= $paraBirimiSembolleri[$para_birimi] ?></p>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                 </div>
                 <div class="text-blue-500">
                     <i class="ri-shopping-cart-line text-2xl"></i>
@@ -111,7 +156,12 @@ try {
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-500">Toplam Alış</p>
-                    <p class="text-xl font-bold text-gray-800"><?= number_format($alisToplam, 2, ',', '.') ?> ₺</p>
+                    <p class="text-xl font-bold text-gray-800"><?= number_format($alisToplam['TRY'], 2, ',', '.') ?> ₺</p>
+                    <?php foreach(['USD', 'EUR', 'GBP'] as $para_birimi): ?>
+                        <?php if($alisToplam[$para_birimi] > 0): ?>
+                            <p class="text-sm text-gray-600"><?= number_format($alisToplam[$para_birimi], 2, ',', '.') ?> <?= $paraBirimiSembolleri[$para_birimi] ?></p>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                 </div>
                 <div class="text-green-500">
                     <i class="ri-store-line text-2xl"></i>
@@ -124,7 +174,12 @@ try {
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-500">Toplam Tahsilat</p>
-                    <p class="text-xl font-bold text-gray-800"><?= number_format($tahsilatToplam, 2, ',', '.') ?> ₺</p>
+                    <p class="text-xl font-bold text-gray-800"><?= number_format($tahsilatToplam['TRY'], 2, ',', '.') ?> ₺</p>
+                    <?php foreach(['USD', 'EUR', 'GBP'] as $para_birimi): ?>
+                        <?php if($tahsilatToplam[$para_birimi] > 0): ?>
+                            <p class="text-sm text-gray-600"><?= number_format($tahsilatToplam[$para_birimi], 2, ',', '.') ?> <?= $paraBirimiSembolleri[$para_birimi] ?></p>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                 </div>
                 <div class="text-purple-500">
                     <i class="ri-money-dollar-circle-line text-2xl"></i>
@@ -137,7 +192,12 @@ try {
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-500">Toplam Ödeme</p>
-                    <p class="text-xl font-bold text-gray-800"><?= number_format($odemeToplam, 2, ',', '.') ?> ₺</p>
+                    <p class="text-xl font-bold text-gray-800"><?= number_format($odemeToplam['TRY'], 2, ',', '.') ?> ₺</p>
+                    <?php foreach(['USD', 'EUR', 'GBP'] as $para_birimi): ?>
+                        <?php if($odemeToplam[$para_birimi] > 0): ?>
+                            <p class="text-sm text-gray-600"><?= number_format($odemeToplam[$para_birimi], 2, ',', '.') ?> <?= $paraBirimiSembolleri[$para_birimi] ?></p>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                 </div>
                 <div class="text-orange-500">
                     <i class="ri-bank-card-line text-2xl"></i>
@@ -161,6 +221,7 @@ try {
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Müşteri</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Para Birimi</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kaydeden</th>
                         </tr>
@@ -168,14 +229,16 @@ try {
                     <tbody class="divide-y divide-gray-200">
                         <?php if (empty($satislar)): ?>
                         <tr>
-                            <td colspan="5" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
+                            <td colspan="6" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
                         </tr>
                         <?php else: ?>
                             <?php foreach ($satislar as $satis): ?>
+                            <?php $paraBirimi = $satis['para_birimi'] ?? 'TRY'; ?>
                             <tr class="hover:bg-gray-50 cursor-pointer" onclick="openInvoiceModal(<?= $satis['id'] ?>)">
                                 <td class="px-4 py-2"><?= date('H:i', strtotime($satis['created_at'])) ?></td>
                                 <td class="px-4 py-2"><?= htmlspecialchars($satis['musteri_ad'] . ' ' . $satis['musteri_soyad']) ?></td>
-                                <td class="px-4 py-2"><?= number_format($satis['genel_toplam'], 2, ',', '.') ?> ₺</td>
+                                <td class="px-4 py-2"><?= number_format($satis['genel_toplam'], 2, ',', '.') ?></td>
+                                <td class="px-4 py-2"><?= $paraBirimiSembolleri[$paraBirimi] ?> (<?= $paraBirimi ?>)</td>
                                 <td class="px-4 py-2">
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                         <?php
@@ -217,6 +280,7 @@ try {
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tedarikçi</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Para Birimi</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kaydeden</th>
                         </tr>
@@ -224,14 +288,16 @@ try {
                     <tbody class="divide-y divide-gray-200">
                         <?php if (empty($alislar)): ?>
                         <tr>
-                            <td colspan="5" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
+                            <td colspan="6" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
                         </tr>
                         <?php else: ?>
                             <?php foreach ($alislar as $alis): ?>
+                            <?php $paraBirimi = $alis['para_birimi'] ?? 'TRY'; ?>
                             <tr class="hover:bg-gray-50 cursor-pointer" onclick="openInvoiceModal(<?= $alis['id'] ?>)">
                                 <td class="px-4 py-2"><?= date('H:i', strtotime($alis['created_at'])) ?></td>
                                 <td class="px-4 py-2"><?= htmlspecialchars($alis['tedarikci_ad']) ?></td>
-                                <td class="px-4 py-2"><?= number_format($alis['genel_toplam'], 2, ',', '.') ?> ₺</td>
+                                <td class="px-4 py-2"><?= number_format($alis['genel_toplam'], 2, ',', '.') ?></td>
+                                <td class="px-4 py-2"><?= $paraBirimiSembolleri[$paraBirimi] ?> (<?= $paraBirimi ?>)</td>
                                 <td class="px-4 py-2">
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                         <?php
@@ -273,6 +339,7 @@ try {
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Müşteri</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Para Birimi</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ödeme Türü</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kaydeden</th>
@@ -281,14 +348,16 @@ try {
                     <tbody class="divide-y divide-gray-200">
                         <?php if (empty($tahsilatlar)): ?>
                         <tr>
-                            <td colspan="6" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
+                            <td colspan="7" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
                         </tr>
                         <?php else: ?>
                             <?php foreach ($tahsilatlar as $tahsilat): ?>
+                            <?php $paraBirimi = $tahsilat['para_birimi'] ?? 'TRY'; ?>
                             <tr class="hover:bg-gray-50">
                                 <td class="px-4 py-2"><?= date('H:i', strtotime($tahsilat['created_at'])) ?></td>
                                 <td class="px-4 py-2"><?= htmlspecialchars($tahsilat['musteri_ad'] . ' ' . $tahsilat['musteri_soyad']) ?></td>
-                                <td class="px-4 py-2"><?= number_format($tahsilat['tutar'], 2, ',', '.') ?> ₺</td>
+                                <td class="px-4 py-2"><?= number_format($tahsilat['tutar'], 2, ',', '.') ?></td>
+                                <td class="px-4 py-2"><?= $paraBirimiSembolleri[$paraBirimi] ?> (<?= $paraBirimi ?>)</td>
                                 <td class="px-4 py-2"><?= ucfirst($tahsilat['odeme_turu']) ?></td>
                                 <td class="px-4 py-2">
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -331,6 +400,7 @@ try {
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tedarikçi</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Para Birimi</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ödeme Türü</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kaydeden</th>
@@ -339,14 +409,16 @@ try {
                     <tbody class="divide-y divide-gray-200">
                         <?php if (empty($odemeler)): ?>
                         <tr>
-                            <td colspan="6" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
+                            <td colspan="7" class="px-4 py-2 text-center text-gray-500">Kayıt bulunamadı</td>
                         </tr>
                         <?php else: ?>
                             <?php foreach ($odemeler as $odeme): ?>
+                            <?php $paraBirimi = $odeme['para_birimi'] ?? 'TRY'; ?>
                             <tr class="hover:bg-gray-50">
                                 <td class="px-4 py-2"><?= date('H:i', strtotime($odeme['created_at'])) ?></td>
                                 <td class="px-4 py-2"><?= htmlspecialchars($odeme['tedarikci_ad']) ?></td>
-                                <td class="px-4 py-2"><?= number_format($odeme['tutar'], 2, ',', '.') ?> ₺</td>
+                                <td class="px-4 py-2"><?= number_format($odeme['tutar'], 2, ',', '.') ?></td>
+                                <td class="px-4 py-2"><?= $paraBirimiSembolleri[$paraBirimi] ?> (<?= $paraBirimi ?>)</td>
                                 <td class="px-4 py-2"><?= ucfirst($odeme['odeme_turu']) ?></td>
                                 <td class="px-4 py-2">
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 

@@ -18,10 +18,18 @@ try {
         case 'musteri_bakiye':
             if ($id > 0) {
                 // Müşteri bakiyesini hesapla
-                $bakiye = hesaplaGuncelBakiye($pdo, $id);
+                $tryBakiye = hesaplaGuncelBakiye($pdo, $id);
+                
+                // Diğer para birimleri için bakiyeler
+                $dovizBakiyeleri = guncelleDovizbakiyeleri($pdo, $id);
+                
                 echo json_encode([
                     'success' => true,
-                    'bakiye' => $bakiye
+                    'bakiye' => $tryBakiye,
+                    'try_bakiye' => $tryBakiye,
+                    'usd_bakiye' => $dovizBakiyeleri['usd'],
+                    'eur_bakiye' => $dovizBakiyeleri['eur'],
+                    'gbp_bakiye' => $dovizBakiyeleri['gbp']
                 ]);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Geçersiz müşteri ID']);

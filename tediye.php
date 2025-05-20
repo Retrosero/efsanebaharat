@@ -1,5 +1,5 @@
 <?php
-// tahsilat.php
+// tediye.php
 require_once 'includes/db.php';
 include 'includes/header.php'; // Soldaki menü + üst bar burada
 
@@ -17,32 +17,32 @@ try {
 
 // Kullanıcı ID ve evrak no tanımla
 $kullaniciID = $_SESSION['kullanici_id'] ?? null;
-$evrakNo = 'THS-' . date('Ymd') . '-' . rand(1000, 9999);
+$evrakNo = 'TED-' . date('Ymd') . '-' . rand(1000, 9999);
 
 // Form post
 $selectedMusteriID = isset($_GET['musteri_id']) ? $_GET['musteri_id'] : null;
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $selectedMusteriID = $_POST['musteri_id']      ?? null;
-    $tahsilatTuru      = $_POST['tahsilat_turu']   ?? 'nakit';
-    $tutar             = floatval($_POST['tutar']  ?? 0);
-    $islemTarihi       = $_POST['tarih']           ?? date('Y-m-d');
+    $tediyeTuru       = $_POST['tediye_turu']      ?? 'nakit';
+    $tutar            = floatval($_POST['tutar']   ?? 0);
+    $islemTarihi      = $_POST['tarih']            ?? date('Y-m-d');
     
     // Yeni eklenen alanlar
-    $banka_id          = null;
-    $cek_senet_no      = null;
-    $vade_tarihi       = null;
-    $aciklama          = trim($_POST['aciklama']   ?? '');
+    $banka_id         = null;
+    $cek_senet_no     = null;
+    $vade_tarihi      = null;
+    $aciklama         = trim($_POST['aciklama']    ?? '');
 
     // Ödeme türüne göre banka_id değerini al
-    if ($tahsilatTuru === 'kredi') {
+    if ($tediyeTuru === 'kredi') {
         $banka_id = $_POST['kredi_banka_id'] ?? null;
-    } elseif ($tahsilatTuru === 'havale') {
+    } elseif ($tediyeTuru === 'havale') {
         $banka_id = $_POST['havale_banka_id'] ?? null;
-    } elseif ($tahsilatTuru === 'cek') {
+    } elseif ($tediyeTuru === 'cek') {
         $banka_id = $_POST['cek_banka_id'] ?? null;
         $cek_senet_no = $_POST['cek_no'] ?? null;
         $vade_tarihi = $_POST['cek_vade'] ?? null;
-    } elseif ($tahsilatTuru === 'senet') {
+    } elseif ($tediyeTuru === 'senet') {
         $cek_senet_no = $_POST['senet_no'] ?? null;
         $vade_tarihi = $_POST['senet_vade'] ?? null;
     }
@@ -51,13 +51,13 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         try {
             $pdo->beginTransaction();
 
-            // Tahsilat kaydı            
+            // Tediye kaydı            
             $stmtT = $pdo->prepare("
                 INSERT INTO odeme_tahsilat (
                     islem_turu, musteri_id, tutar, odeme_turu, 
                     aciklama, islem_tarihi, evrak_no, kullanici_id, onay_durumu, onayli
                 ) VALUES (
-                    'tahsilat', :mid, :tutar, :odeme_turu, 
+                    'tediye', :mid, :tutar, :odeme_turu, 
                     :aciklama, :tarih, :evrak_no, :kullanici_id, 'onaylandi', 1
                 )
             ");
@@ -65,8 +65,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             $stmtT->execute([
                 ':mid' => $selectedMusteriID,
                 ':tutar' => $tutar,
-                ':odeme_turu' => $tahsilatTuru,
-                ':aciklama' => $aciklama ? $aciklama : 'tahsilat',
+                ':odeme_turu' => $tediyeTuru,
+                ':aciklama' => $aciklama ? $aciklama : 'tediye',
                 ':tarih' => $islemTarihi,
                 ':evrak_no' => $evrakNo,
                 ':kullanici_id' => $kullaniciID
@@ -75,7 +75,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             $odeme_id = $pdo->lastInsertId();
 
             // Eğer çek veya senet ise detay tablosuna kaydet
-            if($tahsilatTuru === 'cek' || $tahsilatTuru === 'senet'){
+            if($tediyeTuru === 'cek' || $tediyeTuru === 'senet'){
                 $stmtDet = $pdo->prepare("
                     INSERT INTO odeme_detay (
                         odeme_id, banka_id, cek_senet_no, vade_tarihi
@@ -94,7 +94,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             // Doğrudan cari hesabı güncelle
             $stmtCari = $pdo->prepare("
                 UPDATE musteriler 
-                SET cari_bakiye = cari_bakiye - :tutar 
+                SET cari_bakiye = cari_bakiye + :tutar 
                 WHERE id = :musteri_id
             ");
             $stmtCari->execute([
@@ -103,7 +103,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             ]);
 
             $pdo->commit();
-            $successMessage = 'Tahsilat başarıyla kaydedildi.';
+            $successMessage = 'Tediye başarıyla kaydedildi.';
 
         } catch(Exception $ex){
             $pdo->rollBack();
@@ -119,7 +119,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     else if ($tutar <= 0) {
         $errorMessage = "Hata: Lütfen geçerli bir tutar girin.";
     }
-}
+} 
 
 // Seçili müşteri
 $selectedMusteriName = 'Müşteri Seçiniz';
@@ -134,8 +134,8 @@ if($selectedMusteriID){
     }
 }
 
-// Son 5 tahsilat
-$lastTahsilatlar = [];
+// Son 5 tediye
+$lastTediyeler = [];
 if($selectedMusteriID){
     try {
         $stmtT = $pdo->prepare("
@@ -151,16 +151,16 @@ if($selectedMusteriID){
             JOIN musteriler m ON o.musteri_id = m.id
             LEFT JOIN odeme_detay od ON o.id = od.odeme_id
             LEFT JOIN banka_listesi b ON od.banka_id = b.id
-            WHERE o.musteri_id = :mid AND o.islem_turu = 'tahsilat'
+            WHERE o.musteri_id = :mid AND o.islem_turu = 'tediye'
             ORDER BY o.created_at DESC, o.id DESC
             LIMIT 5
         ");
         $stmtT->execute([':mid' => $selectedMusteriID]);
-        $lastTahsilatlar = $stmtT->fetchAll(PDO::FETCH_ASSOC);
+        $lastTediyeler = $stmtT->fetchAll(PDO::FETCH_ASSOC);
     } catch(Exception $e){
         // ignore
     }
-}
+} 
 ?>
 <div class="p-4 sm:p-6">
   <?php if($successMessage): ?>
@@ -178,13 +178,13 @@ if($selectedMusteriID){
   <div class="flex space-x-1 sm:space-x-2 mb-4 sm:mb-6">
     <button 
       id="tahsilat-tab" 
-      class="tab-active flex-1 py-2 !rounded-button text-sm sm:text-base font-medium transition-all"
+      class="flex-1 py-2 !rounded-button text-sm sm:text-base font-medium bg-white text-gray-600 hover:bg-gray-100 transition-all"
     >
       Tahsilat
     </button>
     <button 
       id="tediye-tab" 
-      class="flex-1 py-2 !rounded-button text-sm sm:text-base font-medium bg-white text-gray-600 hover:bg-gray-100 transition-all"
+      class="tab-active flex-1 py-2 !rounded-button text-sm sm:text-base font-medium transition-all"
     >
       Tediye
     </button>
@@ -194,7 +194,7 @@ if($selectedMusteriID){
     <!-- Form Alanı -->
     <div class="col-span-2">
       <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm mb-4 sm:mb-6">
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">Tahsilat Bilgileri</h2>
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">Tediye Bilgileri</h2>
         <form method="POST" action="">
           <!-- Müşteri Seçimi -->
           <div class="mb-4">
@@ -229,10 +229,10 @@ if($selectedMusteriID){
             </div>
           </div>
 
-          <!-- Tahsilat Türü -->
+          <!-- Tediye Türü -->
           <div class="mb-4">
-            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Tahsilat Türü</label>
-            <input type="hidden" name="tahsilat_turu" id="tahsilatTuru" value="nakit">
+            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Tediye Türü</label>
+            <input type="hidden" name="tediye_turu" id="tediyeTuru" value="nakit">
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 sm:gap-2">
               <button type="button" class="payment-type payment-type-active p-2 sm:p-3 border-2 rounded-lg text-center transition-all" data-type="nakit">
                 <i class="ri-money-dollar-circle-line text-xl sm:text-2xl mb-1"></i>
@@ -407,90 +407,30 @@ if($selectedMusteriID){
                 type="submit"
                 class="w-full py-2 bg-primary text-white rounded-button hover:bg-primary/90 transition-colors text-xs sm:text-sm"
               >
-                Tahsilat Kaydet
+                Tediye Kaydet
               </button>
             </div>
           </div>
         </form>
       </div>
     </div>
-    
-    <!-- Sağ Taraf - Özet ve Son İşlemler -->
+
+    <!-- Tediye Listesi -->
     <div class="col-span-1">
-      <!-- Müşteri Bakiye Özeti -->
-      <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm mb-4">
-        <h3 class="font-medium text-sm sm:text-base mb-3">Müşteri Bakiye Özeti</h3>
-        
-        <?php if($selectedMusteriID): ?>
-        <div class="space-y-2">
-          <div class="flex justify-between items-center">
-            <span class="text-xs sm:text-sm text-gray-600">Müşteri:</span>
-            <span class="text-xs sm:text-sm font-medium"><?= htmlspecialchars($selectedMusteriName) ?></span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-xs sm:text-sm text-gray-600">Cari Bakiye:</span>
-            <span class="text-xs sm:text-sm font-medium <?= $cariBakiye > 0 ? 'text-red-600' : 'text-green-600' ?>">
-              <?= number_format(abs($cariBakiye), 2, ',', '.') ?> ₺
-              <?= $cariBakiye > 0 ? '(Borç)' : ($cariBakiye < 0 ? '(Alacak)' : '') ?>
-            </span>
-          </div>
-        </div>
-        <?php else: ?>
-        <div class="text-xs sm:text-sm text-gray-500 italic">
-          Bakiye bilgisi için lütfen müşteri seçin.
-        </div>
-        <?php endif; ?>
-      </div>
-      
-      <!-- Son Tahsilatlar -->
-      <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm">
-        <h3 class="font-medium text-sm sm:text-base mb-3">Son Tahsilatlar</h3>
-        
-        <?php if($selectedMusteriID && !empty($lastTahsilatlar)): ?>
-        <div class="space-y-2">
-          <?php foreach($lastTahsilatlar as $tahsilat): ?>
-          <div class="p-2 border border-gray-100 rounded hover:bg-gray-50">
-            <div class="flex justify-between items-center">
-              <span class="text-xs sm:text-sm font-medium"><?= date('d.m.Y', strtotime($tahsilat['islem_tarihi'])) ?></span>
-              <span class="text-xs sm:text-sm font-medium text-green-600"><?= number_format($tahsilat['tutar'], 2, ',', '.') ?> ₺</span>
+      <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm mb-4 sm:mb-6">
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">Tediye Listesi</h2>
+        <div class="max-h-80 overflow-y-auto">
+          <?php foreach($lastTediyeler as $tediye): ?>
+            <div class="flex justify-between items-center py-1">
+              <span><?= htmlspecialchars($tediye['ad'] . ' ' . $tediye['soyad']) ?></span>
+              <span><?= htmlspecialchars($tediye['tutar']) ?> TL</span>
             </div>
-            <div class="flex justify-between items-center mt-1">
-              <span class="text-xs text-gray-500">
-                <?php 
-                // Tahsilat bilgisini ekle
-                echo 'Tahsilat - ';
-                
-                switch($tahsilat['odeme_turu']) {
-                  case 'nakit': echo 'Nakit'; break;
-                  case 'kredi': echo 'Kredi Kartı'; break;
-                  case 'havale': echo 'Havale/EFT'; break;
-                  case 'cek': echo 'Çek'; break;
-                  case 'senet': echo 'Senet'; break;
-                  default: echo ucfirst($tahsilat['odeme_turu']);
-                }
-                
-                if(isset($tahsilat['banka_adi']) && !empty($tahsilat['banka_adi'])) {
-                  echo ' - ' . $tahsilat['banka_adi'];
-                }
-                ?>
-              </span>
-            </div>
-          </div>
           <?php endforeach; ?>
         </div>
-        <?php elseif($selectedMusteriID): ?>
-        <div class="text-xs sm:text-sm text-gray-500 italic">
-          Bu müşteriye ait tahsilat kaydı bulunamadı.
-        </div>
-        <?php else: ?>
-        <div class="text-xs sm:text-sm text-gray-500 italic">
-          Tahsilat geçmişi için lütfen müşteri seçin.
-        </div>
-        <?php endif; ?>
       </div>
     </div>
   </div>
-</div>
+</div> 
 
 <script>
 // Müşteri verilerini JSON formatında al
@@ -504,8 +444,8 @@ document.addEventListener('DOMContentLoaded', function(){
   if (tahsilatTab && tediyeTab) {
     [tahsilatTab, tediyeTab].forEach(tab => {
       tab.addEventListener('click', () => {
-        if (tab === tediyeTab) {
-          window.location.href = 'tediye.php';
+        if (tab === tahsilatTab) {
+          window.location.href = 'tahsilat.php';
         } else {
           [tahsilatTab, tediyeTab].forEach(t => t.classList.remove('tab-active'));
           tab.classList.add('tab-active');
@@ -559,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function(){
         if (custDropdown) custDropdown.classList.add('hidden');
         
         // Sayfayı yeniden yükle (müşteri ID'si ile)
-        window.location.href = `tahsilat.php?musteri_id=${musteri.id}`;
+        window.location.href = `tediye.php?musteri_id=${musteri.id}`;
       });
       
       custOptionsDiv.appendChild(option);
@@ -601,9 +541,9 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 
-  // Tahsilat Türü
+  // Tediye Türü
   const payTypes = document.querySelectorAll('.payment-type');
-  const tahsilatTuru = document.getElementById('tahsilatTuru');
+  const tediyeTuru = document.getElementById('tediyeTuru');
   const krediFields = document.getElementById('kredi-fields');
   const havaleFields = document.getElementById('havale-fields');
   const cekFields = document.getElementById('cek-fields');
@@ -616,7 +556,7 @@ document.addEventListener('DOMContentLoaded', function(){
         pt.classList.add('payment-type-active');
         
         const payType = pt.dataset.type;
-        if (tahsilatTuru) tahsilatTuru.value = payType;
+        if (tediyeTuru) tediyeTuru.value = payType;
 
         // Önce tüm alanları gizle
         if (krediFields) krediFields.classList.add('hidden');
@@ -647,4 +587,4 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <?php
 include 'includes/footer.php'; // menü kapanış + scriptler
-?>
+?> 

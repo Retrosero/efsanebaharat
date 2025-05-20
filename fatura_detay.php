@@ -51,9 +51,9 @@ $stmtF = $pdo->prepare("
                WHEN f.fatura_turu = 'alis' THEN t.email
          END AS email,
          CASE 
-           WHEN f.fatura_turu = 'satis' THEN m.cari_bakiye
+           WHEN f.fatura_turu = 'satis' THEN m.id
                WHEN f.fatura_turu = 'alis' THEN NULL
-         END AS cari_bakiye
+         END AS musteri_id
   FROM faturalar f
   LEFT JOIN musteriler m ON f.musteri_id = m.id AND f.fatura_turu = 'satis'
   LEFT JOIN tedarikciler t ON f.tedarikci_id = t.id AND f.fatura_turu = 'alis'
@@ -68,6 +68,24 @@ if (!$fatura) {
             include 'includes/footer.php';
         }
         exit;
+    }
+    
+    // Müşteri için döviz bakiyelerini al (satış faturası ise)
+    if ($fatura['fatura_turu'] == 'satis' && $fatura['musteri_id']) {
+        // Bakiye hesaplama fonksiyonları için dosyayı dahil et
+        require_once 'guncelbakiye.php';
+        
+        // TRY bakiyesi
+        $tryBakiye = hesaplaGuncelBakiye($pdo, $fatura['musteri_id']);
+        
+        // Diğer para birimleri için bakiyeler
+        $dovizBakiyeleri = guncelleDovizbakiyeleri($pdo, $fatura['musteri_id']);
+        
+        // Bakiye bilgilerini fatura dizisine ekle
+        $fatura['try_bakiye'] = $tryBakiye;
+        $fatura['usd_bakiye'] = $dovizBakiyeleri['usd'] ?? 0;
+        $fatura['eur_bakiye'] = $dovizBakiyeleri['eur'] ?? 0;
+        $fatura['gbp_bakiye'] = $dovizBakiyeleri['gbp'] ?? 0;
     }
 } catch (PDOException $e) {
     echo "<div class='p-4 text-red-600'>Veritabanı hatası: " . $e->getMessage() . "</div>";
@@ -177,14 +195,41 @@ if ($modal_mode) {
                 <?php endif; ?>
                 
                 <!-- Cari Bakiye -->
-                <?php if ($fatura['fatura_turu'] == 'satis' && isset($fatura['cari_bakiye'])): ?>
-                <div class="mt-2 pt-2 border-t border-gray-200">
-                    <p class="text-sm font-medium">
-                        Cari Bakiye: 
-                        <span class="<?= $fatura['cari_bakiye'] < 0 ? 'text-red-600' : 'text-green-600' ?>">
-                            <?= number_format($fatura['cari_bakiye'], 2, ',', '.') ?> ₺
-                        </span>
-                    </p>
+                <?php if ($fatura['fatura_turu'] == 'satis'): ?>
+                <div class="mt-3 pt-3 border-t border-gray-200">
+                  <h4 class="font-medium text-gray-700 mb-1">Cari Bakiye:</h4>
+                  
+                  <?php if (isset($fatura['try_bakiye'])): ?>
+                  <div class="<?= $fatura['try_bakiye'] > 0 ? 'text-red-600' : ($fatura['try_bakiye'] < 0 ? 'text-green-600' : 'text-gray-500') ?> flex justify-between">
+                    <span>TRY:</span>
+                    <span><?= number_format(abs($fatura['try_bakiye']), 2, ',', '.') ?> ₺ 
+                    <?= $fatura['try_bakiye'] > 0 ? '(Borçlu)' : ($fatura['try_bakiye'] < 0 ? '(Alacaklı)' : '') ?></span>
+                  </div>
+                  <?php endif; ?>
+                  
+                  <?php if (isset($fatura['usd_bakiye']) && $fatura['usd_bakiye'] != 0): ?>
+                  <div class="<?= $fatura['usd_bakiye'] > 0 ? 'text-red-600' : ($fatura['usd_bakiye'] < 0 ? 'text-green-600' : 'text-gray-500') ?> flex justify-between">
+                    <span>USD:</span>
+                    <span><?= number_format(abs($fatura['usd_bakiye']), 2, ',', '.') ?> $ 
+                    <?= $fatura['usd_bakiye'] > 0 ? '(Borçlu)' : ($fatura['usd_bakiye'] < 0 ? '(Alacaklı)' : '') ?></span>
+                  </div>
+                  <?php endif; ?>
+                  
+                  <?php if (isset($fatura['eur_bakiye']) && $fatura['eur_bakiye'] != 0): ?>
+                  <div class="<?= $fatura['eur_bakiye'] > 0 ? 'text-red-600' : ($fatura['eur_bakiye'] < 0 ? 'text-green-600' : 'text-gray-500') ?> flex justify-between">
+                    <span>EUR:</span>
+                    <span><?= number_format(abs($fatura['eur_bakiye']), 2, ',', '.') ?> € 
+                    <?= $fatura['eur_bakiye'] > 0 ? '(Borçlu)' : ($fatura['eur_bakiye'] < 0 ? '(Alacaklı)' : '') ?></span>
+                  </div>
+                  <?php endif; ?>
+                  
+                  <?php if (isset($fatura['gbp_bakiye']) && $fatura['gbp_bakiye'] != 0): ?>
+                  <div class="<?= $fatura['gbp_bakiye'] > 0 ? 'text-red-600' : ($fatura['gbp_bakiye'] < 0 ? 'text-green-600' : 'text-gray-500') ?> flex justify-between">
+                    <span>GBP:</span>
+                    <span><?= number_format(abs($fatura['gbp_bakiye']), 2, ',', '.') ?> £ 
+                    <?= $fatura['gbp_bakiye'] > 0 ? '(Borçlu)' : ($fatura['gbp_bakiye'] < 0 ? '(Alacaklı)' : '') ?></span>
+                  </div>
+                  <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>

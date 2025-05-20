@@ -90,11 +90,12 @@ try {
         // Her müşteri için bakiye hesapla
         foreach ($musteriler as &$m) {
             try {
+                // Sadece TRY cinsinden bakiyeleri hesapla
                 // Satışları hesapla (faturalar tablosundan)
                 $stmtSatis = $pdo->prepare("
                     SELECT COALESCE(SUM(toplam_tutar), 0) as toplam_satis 
                     FROM faturalar 
-                    WHERE musteri_id = :mid AND fatura_turu = 'satis'
+                    WHERE musteri_id = :mid AND fatura_turu = 'satis' AND para_birimi = 'TRY'
                 ");
                 $stmtSatis->execute([':mid' => $m['id']]);
                 $toplam_satis = $stmtSatis->fetchColumn();
@@ -103,7 +104,7 @@ try {
                 $stmtAlis = $pdo->prepare("
                     SELECT COALESCE(SUM(toplam_tutar), 0) as toplam_alis 
                     FROM faturalar 
-                    WHERE musteri_id = :mid AND fatura_turu = 'alis'
+                    WHERE musteri_id = :mid AND fatura_turu = 'alis' AND para_birimi = 'TRY'
                 ");
                 $stmtAlis->execute([':mid' => $m['id']]);
                 $toplam_alis = $stmtAlis->fetchColumn();
@@ -119,9 +120,49 @@ try {
 
                 // Gerçek bakiyeyi hesapla (satışlar - alışlar - tahsilatlar)
                 $m['gercek_bakiye'] = $toplam_satis - $toplam_alis - $toplam_tahsilat;
+                
+                // Döviz bakiyelerini de ayrı hesapla
+                // USD Bakiye
+                $stmtUSD = $pdo->prepare("
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN toplam_tutar ELSE 0 END), 0) -
+                        COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN toplam_tutar ELSE 0 END), 0) AS usd_bakiye
+                    FROM faturalar 
+                    WHERE musteri_id = :musteri_id 
+                      AND para_birimi = 'USD'
+                ");
+                $stmtUSD->execute([':musteri_id' => $m['id']]);
+                $m['usd_bakiye'] = $stmtUSD->fetchColumn();
+                
+                // EUR Bakiye
+                $stmtEUR = $pdo->prepare("
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN toplam_tutar ELSE 0 END), 0) -
+                        COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN toplam_tutar ELSE 0 END), 0) AS eur_bakiye
+                    FROM faturalar 
+                    WHERE musteri_id = :musteri_id 
+                      AND para_birimi = 'EUR'
+                ");
+                $stmtEUR->execute([':musteri_id' => $m['id']]);
+                $m['eur_bakiye'] = $stmtEUR->fetchColumn();
+                
+                // GBP Bakiye
+                $stmtGBP = $pdo->prepare("
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN toplam_tutar ELSE 0 END), 0) -
+                        COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN toplam_tutar ELSE 0 END), 0) AS gbp_bakiye
+                    FROM faturalar 
+                    WHERE musteri_id = :musteri_id 
+                      AND para_birimi = 'GBP'
+                ");
+                $stmtGBP->execute([':musteri_id' => $m['id']]);
+                $m['gbp_bakiye'] = $stmtGBP->fetchColumn();
             } catch (Exception $e) {
                 // Bakiye hesaplanamadıysa varsayılan değer ata
                 $m['gercek_bakiye'] = 0;
+                $m['usd_bakiye'] = 0;
+                $m['eur_bakiye'] = 0;
+                $m['gbp_bakiye'] = 0;
             }
         }
     }
@@ -226,10 +267,16 @@ try {
         <div class="block md:hidden">
             <div id="customerCards" class="grid grid-cols-1 gap-3 mx-1">
                 <?php foreach ($musteriler as $musteri): 
+                    // TRY bakiyesi
                     $bakiye = $musteri['gercek_bakiye'] ?? 0;
                     $bakiyeClass = $bakiye > 0 ? 'text-red-500' : ($bakiye < 0 ? 'text-green-500' : 'text-gray-900');
                     $bakiyeText = $bakiye > 0 ? number_format($bakiye, 2, ',', '.') . ' ₺ (Borçlu)' : 
                                 ($bakiye < 0 ? number_format(abs($bakiye), 2, ',', '.') . ' ₺ (Alacaklı)' : '0,00 ₺');
+                    
+                    // Döviz bakiyeleri
+                    $usdBakiye = $musteri['usd_bakiye'] ?? 0;
+                    $eurBakiye = $musteri['eur_bakiye'] ?? 0;
+                    $gbpBakiye = $musteri['gbp_bakiye'] ?? 0;
                 ?>
                 <div 
                     class="bg-white rounded-lg shadow p-3 cursor-pointer" 
@@ -249,6 +296,21 @@ try {
                         </div>
                         <div class="<?= $bakiyeClass ?> text-xs font-medium text-right">
                             <?= $bakiyeText ?>
+                            <?php if ($usdBakiye != 0): ?>
+                                <div class="<?= $usdBakiye < 0 ? 'text-green-500' : ($usdBakiye > 0 ? 'text-red-500' : 'text-gray-900') ?>">
+                                    <?= number_format(abs($usdBakiye), 2, ',', '.') ?> $ (<?= $usdBakiye < 0 ? 'Alacaklı' : 'Borçlu' ?>)
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($eurBakiye != 0): ?>
+                                <div class="<?= $eurBakiye < 0 ? 'text-green-500' : ($eurBakiye > 0 ? 'text-red-500' : 'text-gray-900') ?>">
+                                    <?= number_format(abs($eurBakiye), 2, ',', '.') ?> € (<?= $eurBakiye < 0 ? 'Alacaklı' : 'Borçlu' ?>)
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($gbpBakiye != 0): ?>
+                                <div class="<?= $gbpBakiye < 0 ? 'text-green-500' : ($gbpBakiye > 0 ? 'text-red-500' : 'text-gray-900') ?>">
+                                    <?= number_format(abs($gbpBakiye), 2, ',', '.') ?> £ (<?= $gbpBakiye < 0 ? 'Alacaklı' : 'Borçlu' ?>)
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="mt-2 grid grid-cols-2 gap-1">
@@ -292,12 +354,14 @@ try {
             <div class="overflow-x-auto w-full">
                 <table class="w-full" id="customersTable">
                     <thead>
-                        <tr class="bg-gray-50 border-b border-gray-200">
-                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Müşteri Kodu</th>
-                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Müşteri</th>
-                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tip</th>
-                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Telefon</th>
-                            <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bakiye</th>
+                        <tr class="bg-gray-50">
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Müşteri Kodu</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Müşteri Adı</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tip</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Telefon</th>
+                            <th scope="col" class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bakiye (TL)</th>
+                            <th scope="col" class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Döviz Bakiye</th>
+                            <th scope="col" class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">İşlemler</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
@@ -306,19 +370,25 @@ try {
                             $bakiyeClass = $bakiye > 0 ? 'text-red-500' : ($bakiye < 0 ? 'text-green-500' : 'text-gray-900');
                             $bakiyeText = $bakiye > 0 ? number_format($bakiye, 2, ',', '.') . ' ₺ (Borçlu)' : 
                                         ($bakiye < 0 ? number_format(abs($bakiye), 2, ',', '.') . ' ₺ (Alacaklı)' : '0,00 ₺');
+                            
+                            // Döviz bakiyeleri
+                            $usdBakiye = $musteri['usd_bakiye'] ?? 0;
+                            $eurBakiye = $musteri['eur_bakiye'] ?? 0;
+                            $gbpBakiye = $musteri['gbp_bakiye'] ?? 0;
                         ?>
-                        <tr 
-                            class="hover:bg-gray-50 cursor-pointer transition-colors" 
-                            onclick="window.location.href='musteri_detay.php?id=<?= $musteri['id'] ?>'"
-                        >
-                            <td class="px-2 py-2 text-xs sm:text-sm text-gray-900 whitespace-nowrap"><?= htmlspecialchars($musteri['musteri_kodu'] ?? '') ?></td>
-                            <td class="px-2 py-2 text-xs sm:text-sm text-gray-900 whitespace-nowrap">
+                        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='musteri_detay.php?id=<?= $musteri['id'] ?>'">
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                <?= htmlspecialchars($musteri['musteri_kodu'] ?? '') ?>
+                            </td>
+                            <td class="px-3 py-2 whitespace-nowrap text-sm">
+                                <div class="font-medium text-gray-900">
                                 <?= htmlspecialchars($musteri['ad'] . ' ' . $musteri['soyad']) ?>
                                 <?php if (isset($musteri['aktif']) && $musteri['aktif'] == 0): ?>
                                     <span class="ml-1 px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded-full">Pasif</span>
                                 <?php endif; ?>
+                                </div>
                             </td>
-                            <td class="px-2 py-2 text-xs sm:text-sm text-gray-900 whitespace-nowrap">
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                                 <?php 
                                 if (!empty($musteri['tip_id'])) {
                                     $tip_bulundu = false;
@@ -337,8 +407,39 @@ try {
                                 }
                                 ?>
                             </td>
-                            <td class="px-2 py-2 text-xs sm:text-sm text-gray-900 whitespace-nowrap"><?= htmlspecialchars($musteri['telefon'] ?: '-') ?></td>
-                            <td class="px-2 py-2 text-xs sm:text-sm whitespace-nowrap text-right <?= $bakiyeClass ?>"><?= $bakiyeText ?></td>
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                                <?= htmlspecialchars($musteri['telefon'] ?: '-') ?>
+                            </td>
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-right <?= $bakiyeClass ?>">
+                                <?= $bakiyeText ?>
+                            </td>
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-right">
+                                <?php if ($usdBakiye != 0): ?>
+                                    <div class="<?= $usdBakiye < 0 ? 'text-green-500' : ($usdBakiye > 0 ? 'text-red-500' : 'text-gray-900') ?>">
+                                        <?= number_format(abs($usdBakiye), 2, ',', '.') ?> $
+                                    </div>
+                                <?php endif; ?>
+                                <?php if ($eurBakiye != 0): ?>
+                                    <div class="<?= $eurBakiye < 0 ? 'text-green-500' : ($eurBakiye > 0 ? 'text-red-500' : 'text-gray-900') ?>">
+                                        <?= number_format(abs($eurBakiye), 2, ',', '.') ?> €
+                                    </div>
+                                <?php endif; ?>
+                                <?php if ($gbpBakiye != 0): ?>
+                                    <div class="<?= $gbpBakiye < 0 ? 'text-green-500' : ($gbpBakiye > 0 ? 'text-red-500' : 'text-gray-900') ?>">
+                                        <?= number_format(abs($gbpBakiye), 2, ',', '.') ?> £
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-3 py-2 whitespace-nowrap text-sm text-center">
+                                <div class="flex justify-center space-x-2">
+                                    <a href="musteri_detay.php?id=<?= $musteri['id'] ?>" class="text-blue-600 hover:text-blue-900">
+                                        <i class="ri-eye-line"></i>
+                                    </a>
+                                    <a href="musteri_duzenle.php?id=<?= $musteri['id'] ?>" class="text-indigo-600 hover:text-indigo-900">
+                                        <i class="ri-edit-line"></i>
+                                    </a>
+                                </div>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                         
