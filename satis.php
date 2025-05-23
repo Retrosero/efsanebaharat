@@ -3,6 +3,16 @@
 require_once 'includes/db.php';
 include 'includes/header.php'; // Soldaki menü + top bar layout
 
+// Sistem ayarlarından varsayılan ağırlık birimini al
+$varsayilan_agirlik_birimi = 'gr'; // Varsayılan değer
+try {
+    $stmt = $pdo->prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar = 'varsayilan_agirlik_birimi'");
+    $stmt->execute();
+    $varsayilan_agirlik_birimi = $stmt->fetchColumn() ?: 'gr';
+} catch(PDOException $e) {
+    // Hata durumunda varsayılan değer gr olarak kalır
+}
+
 // musteriler tablosu (müşteri seçimi)
 $customerRows = [];
 try {
@@ -48,6 +58,12 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
 ?>
 <div class="p-2">
   <h1 class="text-lg sm:text-xl font-semibold mb-3"></h1>
+
+  <!-- JavaScript'e varsayılan birim değerini aktaralım -->
+  <script>
+    // PHP'den gelen varsayılan ağırlık birimi
+    const varsayilanAgirlikBirimi = "<?php echo $varsayilan_agirlik_birimi; ?>";
+  </script>
 
   <!-- Yeni Üst Menü Tasarımı - Sabit (Fixed) -->
   <div class="flex items-center justify-between gap-2 mb-3 sticky top-0 z-40 bg-white p-2 border-b shadow-sm">
@@ -1271,7 +1287,7 @@ function renderProducts() {
             <input 
               type="number" 
               id="directQty_${p.id}"
-              class="w-full px-2 sm:px-3 py-1 sm:py-2 border rounded text-center text-sm sm:text-base" 
+              class="w-full px-2 sm:px-3 py-1 sm:py-2 border rounded-l text-center text-sm sm:text-base" 
               value="0" 
               min="1" 
               step="1"
@@ -1280,7 +1296,12 @@ function renderProducts() {
               onfocus="this.select()"
               ${p.stok_miktari <= 0 ? 'disabled' : ''}
             >
-            <span class="px-2 sm:px-3 py-1 sm:py-2 border bg-gray-50 text-sm sm:text-base">gr</span>
+            <button 
+              id="weightToggle_${p.id}"
+              class="px-2 sm:px-3 py-1 sm:py-2 border-y border-r rounded-r text-sm sm:text-base bg-gray-50 hover:bg-gray-100 cursor-pointer"
+              onclick="toggleWeightUnit(${p.id})"
+              data-current-unit="${varsayilanAgirlikBirimi}"
+            >${varsayilanAgirlikBirimi}</button>
           </div>
         `}
       </div>
@@ -1356,8 +1377,19 @@ function showQtyModal(productId) {
         `;
         unitLabel = 'Adet:';
     } else if (product.olcum_birimi === 'kg' || product.olcum_birimi === 'gr') {
-        const currentStockInKg = product.olcum_birimi === 'gr' ? product.stok_miktari / 1000 : product.stok_miktari;
-        const currentStockInGr = product.olcum_birimi === 'kg' ? product.stok_miktari * 1000 : product.stok_miktari;
+        // Stok miktarını varsayılan birime göre hesaplayalım
+        let initialValue, stockInKg, stockInGr;
+        
+        // Ürünün nativ biriminde stok bilgisi
+        stockInKg = product.olcum_birimi === 'gr' ? product.stok_miktari / 1000 : product.stok_miktari;
+        stockInGr = product.olcum_birimi === 'kg' ? product.stok_miktari * 1000 : product.stok_miktari;
+        
+        // Varsayılan birime göre başlangıç değerleri
+        if (varsayilanAgirlikBirimi === 'kg') {
+            initialValue = 0.1; // 100 gr = 0.1 kg
+        } else {
+            initialValue = 100; // 100 gr
+        }
 
         qtyInputHtml = `
             <div class="flex flex-col space-y-2">
@@ -1366,19 +1398,19 @@ function showQtyModal(productId) {
                         type="number" 
                         id="modalQty" 
                         class="w-24 px-3 py-1 border rounded-l text-center" 
-                        value="100" 
-                        min="1" 
-                        max="${currentStockInGr}"
-                        step="1"
+                        value="${initialValue}" 
+                        min="${varsayilanAgirlikBirimi === 'kg' ? '0.001' : '1'}" 
+                        max="${varsayilanAgirlikBirimi === 'kg' ? stockInKg : stockInGr}"
+                        step="${varsayilanAgirlikBirimi === 'kg' ? '0.001' : '1'}"
                         onchange="validateModalQty()"
                     >
                     <select id="weightUnit" class="border border-l-0 rounded-r px-2 py-1 bg-gray-50" onchange="updateWeightUnit()">
-                        <option value="gr" selected>gr</option>
-                        <option value="kg">kg</option>
+                        <option value="gr" ${varsayilanAgirlikBirimi === 'gr' ? 'selected' : ''}>gr</option>
+                        <option value="kg" ${varsayilanAgirlikBirimi === 'kg' ? 'selected' : ''}>kg</option>
                     </select>
                 </div>
                 <div class="text-xs text-gray-500">
-                    Stok: ${parseFloat(currentStockInKg).toFixed(3)} kg (${parseFloat(currentStockInGr).toFixed(0)} gr)
+                    Stok: ${parseFloat(stockInKg).toFixed(3)} kg (${parseFloat(stockInGr).toFixed(0)} gr)
                 </div>
             </div>
         `;
@@ -1474,17 +1506,23 @@ function updateWeightUnit() {
         qtyInput.min = "0.001";
         const stockInKg = product.olcum_birimi === 'gr' ? stockNative / 1000 : stockNative;
         qtyInput.max = stockInKg.toFixed(3);
-        // Convert current value if it was in gr
-        // Example: if input had 500 (gr) and user switches to kg, it should become 0.5
-        // This part is tricky because we don't know the "previous" unit of the input value itself easily.
-        // For simplicity, we'll assume a common starting point or just validate against new max.
-        // qtyInput.value = (currentValue / 1000).toFixed(3); // If we assume currentValue was gr
+        
+        // Eğer şu anki birim gr ise, kg'a çevir
+        if (qtyInput.step === "1") {
+            currentValue = currentValue / 1000;
+            qtyInput.value = currentValue.toFixed(3);
+        }
     } else { // gr
         qtyInput.step = "1";
         qtyInput.min = "1";
         const stockInGr = product.olcum_birimi === 'kg' ? stockNative * 1000 : stockNative;
         qtyInput.max = stockInGr.toFixed(0);
-        // qtyInput.value = (currentValue * 1000).toFixed(0); // If we assume currentValue was kg
+        
+        // Eğer şu anki birim kg ise, gr'a çevir
+        if (qtyInput.step === "0.001") {
+            currentValue = currentValue * 1000;
+            qtyInput.value = currentValue.toFixed(0);
+        }
     }
     validateModalQty(); // Re-validate with new constraints
 }
@@ -1668,7 +1706,20 @@ function renderCart(){
     <div class="flex gap-3 p-3 bg-gray-50 rounded-lg">
       <div class="flex-1">
         <h4 class="font-medium text-xs">${item.name} (${item.olcumBirimi})</h4>
-        <p class="text-xs text-gray-500">Birim Fiyat: ${formatCurrency(item.price)} / ${item.olcumBirimi}</p>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="text-xs text-gray-500">Birim Fiyat:</span>
+          <div class="flex items-center">
+            <input 
+              type="number" 
+              class="w-20 px-1 py-0.5 text-xs border rounded-l"
+              value="${item.price}"
+              step="0.01"
+              min="0"
+              onchange="updateItemPrice(${index}, this.value)"
+            >
+            <span class="text-xs bg-gray-100 px-1 py-0.5 border-y border-r rounded-r">₺</span>
+          </div>
+        </div>
         <p class="text-xs text-gray-500">Kod: PRD${String(item.id).padStart(4, '0')}</p>
         ${
           item.note
@@ -2709,17 +2760,49 @@ function printInvoice() {
   printFrame.style.display = 'none';
   document.body.appendChild(printFrame);
   
+  // print=1 parametresi ile fatura_detay.php'deki şablonu kullan
   printFrame.src = `fatura_detay.php?id=${currentInvoiceId}&print=1`;
   
   // Iframe yüklendikten sonra yazdır
   printFrame.onload = function() {
     try {
-      printFrame.contentWindow.print();
+      // Yazdırma stillerini iframe'e ekle
+      const styleElement = printFrame.contentDocument.createElement('style');
+      styleElement.textContent = `
+        @media print {
+          .bottom-nav, .bottom-navigation, nav, footer, .footer, .ana-footer, 
+          .nav-bar, .sidebar, .control-bar, #ana-footer, #footer, #bottom-nav, 
+          .print-hidden, .no-print {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            width: 0 !important;
+            position: absolute !important;
+            left: -9999px !important;
+          }
+          
+          body::after {
+            content: none !important;
+          }
+          
+          /* Sayfa kenar boşluklarını ayarla */
+          @page {
+            margin: 0.5cm;
+            size: A4;
+          }
+        }
+      `;
+      printFrame.contentDocument.head.appendChild(styleElement);
       
-      // Yazdırma işlemi tamamlandıktan sonra iframe'i kaldır
+      // Yazdır
       setTimeout(() => {
-        document.body.removeChild(printFrame);
-      }, 1000);
+        printFrame.contentWindow.print();
+        
+        // Yazdırma işlemi tamamlandıktan sonra iframe'i kaldır
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1000);
+      }, 300);
     } catch (e) {
       console.error('Yazdırma hatası:', e);
       // Hata durumunda normal sayfaya yönlendir
@@ -2729,6 +2812,155 @@ function printInvoice() {
   
   closePrintInvoiceModal();
 }
+
+// Ürün fiyatını güncelleme fonksiyonu - Bu kodu ekleyin
+function updateItemPrice(itemIndex, newPrice) {
+  const item = cart[itemIndex];
+  if (!item) return;
+  
+  // Geçerli bir fiyat kontrolü
+  let price = parseFloat(newPrice);
+  if (isNaN(price) || price < 0) {
+    price = 0;
+  }
+  
+  // Fiyatı güncelle
+  item.price = price;
+  
+  // Toplam fiyatı yeniden hesapla ve sepeti yeniden göster
+  renderCart();
+}
+
+// Ağırlık birimini değiştirme fonksiyonu
+function toggleWeightUnit(productId) {
+  const toggleBtn = document.getElementById(`weightToggle_${productId}`);
+  const inputField = document.getElementById(`directQty_${productId}`);
+  if (!toggleBtn || !inputField) return;
+  
+  const currentUnit = toggleBtn.dataset.currentUnit;
+  const newUnit = currentUnit === 'gr' ? 'kg' : 'gr';
+  
+  // Birim değiştirilince değeri de dönüştür
+  const currentValue = parseFloat(inputField.value) || 0;
+  let newValue = 0;
+  
+  if (currentUnit === 'gr' && newUnit === 'kg') {
+    newValue = currentValue / 1000; // gr'dan kg'a çevir
+    inputField.step = 0.001;
+    inputField.min = 0.001;
+  } else {
+    newValue = currentValue * 1000; // kg'dan gr'a çevir
+    inputField.step = 1;
+    inputField.min = 1;
+  }
+  
+  // Yeni değeri input alanına yaz
+  inputField.value = newValue.toFixed(newUnit === 'kg' ? 3 : 0);
+  
+  // Buton metnini ve veri özelliğini güncelle
+  toggleBtn.textContent = newUnit;
+  toggleBtn.dataset.currentUnit = newUnit;
+}
+
+// validateAndAddToCartWeight fonksiyonunu güncelleyelim
+function validateAndAddToCartWeight(productId) {
+  const input = document.getElementById(`directQty_${productId}`);
+  const toggleBtn = document.getElementById(`weightToggle_${productId}`);
+  if (!input || !toggleBtn) return;
+  
+  const product = products.find(p => p.id === productId);
+  if (!product) return;
+  
+  // Ağırlık birimi (gr veya kg)
+  const weightUnit = toggleBtn.dataset.currentUnit;
+  
+  // Kullanıcının girdiği değer
+  let value = parseFloat(input.value) || 0;
+  
+  // Minimum ve maksimum değer kontrolü
+  let minValue = weightUnit === 'kg' ? 0.001 : 1;
+  
+  if (value < minValue) {
+    value = minValue;
+    input.value = value;
+  }
+  
+  // Stok kontrolü - ağırlık birimlerini eşleştirerek
+  let stockInSelectedUnit;
+  if (weightUnit === 'kg') {
+    stockInSelectedUnit = product.olcum_birimi === 'gr' ? product.stok_miktari / 1000 : product.stok_miktari;
+  } else { // gr
+    stockInSelectedUnit = product.olcum_birimi === 'kg' ? product.stok_miktari * 1000 : product.stok_miktari;
+  }
+  
+  if (value > stockInSelectedUnit) {
+    value = stockInSelectedUnit;
+    input.value = weightUnit === 'kg' ? value.toFixed(3) : Math.floor(value);
+  }
+  
+  // Sepete ekle
+  const existingItem = cart.findIndex(item => item.id === productId && item.olcumBirimi === weightUnit);
+  
+  if (value <= 0) {
+    // Değer 0 veya negatif ise, bu birimle varolan ürünü sepetten çıkar
+    if (existingItem !== -1) {
+      cart.splice(existingItem, 1);
+    }
+  } else {
+    if (existingItem !== -1) {
+      // Aynı birimle varolan ürünü güncelle
+      cart[existingItem].qty = value;
+    } else {
+      // Ürünü yeni bir kayıt olarak ekle
+      cart.push({
+        id: product.id,
+        name: product.urun_adi,
+        price: parseFloat(product.satis_fiyati),
+        qty: value,
+        olcumBirimi: weightUnit,
+        note: ''
+      });
+    }
+  }
+  
+  updateCartCount();
+  renderCart();
+}
+
+// Ürün kartlarındaki ilk ağırlık birimini ayarlamak için
+function initializeWeightUnits() {
+  // Sayfa yüklendiğinde varsayılan ağırlık birimini ayarla
+  document.querySelectorAll('[id^="weightToggle_"]').forEach(toggleBtn => {
+    toggleBtn.textContent = varsayilanAgirlikBirimi;
+    toggleBtn.dataset.currentUnit = varsayilanAgirlikBirimi;
+    
+    // Input alanının step ve min değerlerini de ayarla
+    const productId = toggleBtn.id.split('_')[1];
+    const inputField = document.getElementById(`directQty_${productId}`);
+    if (inputField) {
+      if (varsayilanAgirlikBirimi === 'kg') {
+        inputField.step = 0.001;
+        inputField.min = 0.001;
+      } else {
+        inputField.step = 1;
+        inputField.min = 1;
+      }
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Diğer init işlemlerinden sonra
+  // ...
+  loadCartFromLocalStorage();
+  renderProducts();
+  renderCart();
+  
+  // Ağırlık birimlerini başlat
+  initializeWeightUnits();
+  
+  // ...
+});
 </script>
 
 <!-- Bottom Navigation - Sadece Mobil Görünümde -->

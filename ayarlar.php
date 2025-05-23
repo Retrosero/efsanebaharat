@@ -377,6 +377,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errorMessage = 'Geçersiz müşteri tipi ID.';
                 }
                 break;
+
+            case 'update_sales_settings':
+                $agirlik_birimi = $_POST['agirlik_birimi'] ?? 'gr';
+                $para_birimi = $_POST['para_birimi'] ?? 'TRY';
+                $kdv_orani = $_POST['kdv_orani'] ?? 18;
+                
+                try {
+                    // Ağırlık birimi ayarını güncelle/ekle
+                    $stmt = $pdo->prepare("INSERT INTO sistem_ayarlari (anahtar, deger) VALUES (:anahtar, :deger) 
+                                         ON DUPLICATE KEY UPDATE deger = :deger");
+                    
+                    // Ağırlık birimi ayarını kaydet
+                    $stmt->execute([
+                        ':anahtar' => 'varsayilan_agirlik_birimi',
+                        ':deger' => $agirlik_birimi
+                    ]);
+                    
+                    // Para birimi ayarını kaydet
+                    $stmt->execute([
+                        ':anahtar' => 'varsayilan_para_birimi',
+                        ':deger' => $para_birimi
+                    ]);
+                    
+                    // KDV oranı ayarını kaydet
+                    $stmt->execute([
+                        ':anahtar' => 'varsayilan_kdv_orani',
+                        ':deger' => $kdv_orani
+                    ]);
+                    
+                    $successMessage = 'Satış ayarları başarıyla güncellendi.';
+                } catch (PDOException $e) {
+                    $errorMessage = 'Satış ayarları güncellenirken hata oluştu: ' . $e->getMessage();
+                }
+                break;
         }
     }
 }
@@ -604,25 +638,45 @@ $kategoriler = $pdo->query("SELECT * FROM kategoriler ORDER BY kategori_adi")->f
                 <div id="sales" class="tab-content">
                     <div class="space-y-6">
                         <div class="bg-white p-6 rounded-lg border">
-                            <h3 class="text-lg font-medium mb-4">Fiyatlandırma Ayarları</h3>
+                            <h3 class="text-lg font-semibold mb-4">Fiyatlandırma Ayarları</h3>
+                            <form method="POST">
+                                <input type="hidden" name="action" value="update_sales_settings">
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Para Birimi</label>
-                                    <select class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
-                                        <option>TRY - Türk Lirası</option>
-                                        <option>USD - Amerikan Doları</option>
-                                        <option>EUR - Euro</option>
+                                        <select name="para_birimi" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                            <option value="TRY">TRY - Türk Lirası</option>
+                                            <option value="USD">USD - Amerikan Doları</option>
+                                            <option value="EUR">EUR - Euro</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Varsayılan KDV Oranı (%)</label>
-                                    <input type="number" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="18">
+                                        <input type="number" name="kdv_orani" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary" value="18">
                                 </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Varsayılan Ağırlık Birimi</label>
+                                        <select name="agirlik_birimi" class="mt-1 block w-full rounded-button border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                                            <?php
+                                            $varsayilan_birim = '';
+                                            try {
+                                                $stmt = $pdo->prepare("SELECT deger FROM sistem_ayarlari WHERE anahtar = 'varsayilan_agirlik_birimi'");
+                                                $stmt->execute();
+                                                $varsayilan_birim = $stmt->fetchColumn() ?: 'gr';
+                                            } catch(PDOException $e) {
+                                                // Hata durumunda varsayılan değer gr olsun
+                                                $varsayilan_birim = 'gr';
+                                            }
+                                            ?>
+                                            <option value="gr" <?= $varsayilan_birim == 'gr' ? 'selected' : '' ?>>Gr (Gram)</option>
+                                            <option value="kg" <?= $varsayilan_birim == 'kg' ? 'selected' : '' ?>>Kg (Kilogram)</option>
+                                        </select>
                             </div>
                         </div>
-                        <div class="flex justify-end space-x-3">
-                            <button class="px-4 py-2 border border-gray-300 rounded-button text-gray-700 hover:bg-gray-50">İptal</button>
-                            <button class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">Kaydet</button>
+                                <div class="mt-4 flex justify-end">
+                                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-button hover:bg-primary/90">Kaydet</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>

@@ -5,14 +5,17 @@
 if (session_status() == PHP_SESSION_NONE) {
     // Oturum başlamadan önce ayarları yapabiliriz
     // Oturum süresini uzun tutacak ayarlar
-    ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60); // 30 gün (saniye cinsinden)
-    ini_set('session.cookie_lifetime', 30 * 24 * 60 * 60); // 30 gün (saniye cinsinden)
+    ini_set('session.gc_maxlifetime', 365 * 24 * 60 * 60); // 1 yıl (saniye cinsinden)
+    ini_set('session.cookie_lifetime', 365 * 24 * 60 * 60); // 1 yıl (saniye cinsinden)
     session_name('efsanebaharat_session');
     
     // Oturum ve çerezlerin güvenliği için ayarlar
     ini_set('session.cookie_httponly', 1);
     ini_set('session.use_only_cookies', 1);
-    ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
+    
+    // HTTP/HTTPS kontrolü (development ortamında HTTPS olmayabilir)
+    $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+    ini_set('session.cookie_secure', $secure);
     
     // Oturumu başlat
     session_start();
@@ -20,17 +23,18 @@ if (session_status() == PHP_SESSION_NONE) {
 
 // Çerez süreleri
 define('REMEMBER_COOKIE_NAME', 'remember_token');
-define('REMEMBER_COOKIE_DURATION', 60 * 60 * 24 * 30); // 30 gün
+define('REMEMBER_COOKIE_DURATION', 60 * 60 * 24 * 365); // 1 yıl
 
 /**
  * Kullanıcı giriş işlemini gerçekleştirir
  * 
+ * @param PDO $pdo Veritabanı bağlantısı
  * @param string $eposta Kullanıcı e-posta adresi
  * @param string $sifre Kullanıcı şifresi
  * @param bool $beni_hatirla Beni hatırla seçeneği
  * @return bool|array Başarılı ise kullanıcı bilgileri, başarısız ise false
  */
-function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) { // Varsayılan olarak true yaptık
+function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
     try {
         // Kullanıcıyı veritabanında ara
         $stmt = $pdo->prepare("SELECT * FROM kullanicilar WHERE eposta = :eposta AND aktif = 1");
@@ -41,6 +45,9 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) { // Varsay
         if (!$kullanici || !password_verify($sifre, $kullanici['sifre'])) {
             return false;
         }
+        
+        // Önceki oturum verilerini temizle
+        $_SESSION = array();
         
         // Oturumu başlat
         $_SESSION['kullanici_id'] = $kullanici['id'];
@@ -58,7 +65,7 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) { // Varsay
             // Token'ı veritabanına kaydet
             $stmt = $pdo->prepare("
                 UPDATE kullanicilar 
-                SET remember_token = :token, token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY) 
+                SET remember_token = :token, token_expires_at = DATE_ADD(NOW(), INTERVAL 365 DAY) 
                 WHERE id = :id
             ");
             $stmt->execute([
@@ -66,15 +73,21 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) { // Varsay
                 ':id' => $kullanici['id']
             ]);
             
+            // HTTP/HTTPS kontrolü (development ortamında HTTPS olmayabilir)
+            $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+            
             // Token'ı çereze kaydet
             setcookie(
                 REMEMBER_COOKIE_NAME,
                 $kullanici['id'] . ':' . $token,
-                time() + REMEMBER_COOKIE_DURATION,
-                '/',
-                '',
-                isset($_SERVER['HTTPS']),
-                true
+                [
+                    'expires' => time() + REMEMBER_COOKIE_DURATION,
+                    'path' => '/',
+                    'domain' => '',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]
             );
         }
         
@@ -92,14 +105,18 @@ function hatirlamaTokeniKontrol($pdo) {
     if (isset($_COOKIE[REMEMBER_COOKIE_NAME])) {
         list($kullanici_id, $token) = explode(':', $_COOKIE[REMEMBER_COOKIE_NAME], 2);
         
+        if (!$kullanici_id || !$token) {
+            return false;
+        }
+        
         $stmt = $pdo->prepare("
             SELECT * FROM kullanicilar 
-            WHERE id = :id AND token_expires_at > NOW() AND aktif = 1
+            WHERE id = :id AND token_expires_at > NOW() AND aktif = 1 AND remember_token IS NOT NULL
         ");
         $stmt->execute([':id' => $kullanici_id]);
         $kullanici = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($kullanici && password_verify($token, $kullanici['remember_token'])) {
+        if ($kullanici && $kullanici['remember_token'] && password_verify($token, $kullanici['remember_token'])) {
             // Kullanıcı doğrulandı, oturum bilgilerini oluştur
             $_SESSION['kullanici_id'] = $kullanici['id'];
             $_SESSION['kullanici_adi'] = $kullanici['kullanici_adi'];
@@ -110,10 +127,27 @@ function hatirlamaTokeniKontrol($pdo) {
             // Token süresini yenile
             $stmt = $pdo->prepare("
                 UPDATE kullanicilar 
-                SET token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY) 
+                SET token_expires_at = DATE_ADD(NOW(), INTERVAL 365 DAY) 
                 WHERE id = :id
             ");
             $stmt->execute([':id' => $kullanici['id']]);
+            
+            // HTTP/HTTPS kontrolü (development ortamında HTTPS olmayabilir)
+            $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+            
+            // Token'ı çereze kaydet (yenile)
+            setcookie(
+                REMEMBER_COOKIE_NAME,
+                $kullanici['id'] . ':' . $token,
+                [
+                    'expires' => time() + REMEMBER_COOKIE_DURATION,
+                    'path' => '/',
+                    'domain' => '',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]
+            );
             
             return true;
         }

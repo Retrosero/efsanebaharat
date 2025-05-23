@@ -598,8 +598,62 @@ document.addEventListener('DOMContentLoaded', function() {
     satirTemplate.querySelector('.miktar-input').addEventListener('input', hesaplaSatirToplam);
     satirTemplate.querySelector('.fiyat-input').addEventListener('input', hesaplaSatirToplam);
     
+    // Tab tuşu davranışlarını ele al
+    const urunSearch = satirTemplate.querySelector('.urun-search');
+    const miktarInput = satirTemplate.querySelector('.miktar-input');
+    const fiyatInput = satirTemplate.querySelector('.fiyat-input');
+    
+    // Tab ve focus davranışları için event listener'lar ekle
+    [urunSearch, miktarInput, fiyatInput].forEach(input => {
+      // Focus olduğunda seçim yap
+      if (input.classList.contains('miktar-input') || input.classList.contains('fiyat-input')) {
+        input.addEventListener('focus', function() {
+          this.select();
+        });
+      }
+      
+      // Tab tuşu davranışları
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          // Tab'a basıldığında seçili öğe varsa ve dropdown açıksa seçimi yap
+          if (input === urunSearch && !e.shiftKey) {
+            const dropdown = satirTemplate.querySelector('.urun-results');
+            if (!dropdown.classList.contains('hidden')) {
+              const selectedOption = dropdown.querySelector('.bg-gray-100');
+              if (selectedOption) {
+                e.preventDefault();
+                selectUrun(selectedOption, satirTemplate);
+              }
+            }
+          }
+        }
+      });
+    });
+    
+    // Fiyat inputundan çıkılınca otomatik yeni satır ekleme kontrolü
+    fiyatInput.addEventListener('blur', function() {
+      const satir = this.closest('tr');
+      const satirlar = document.querySelectorAll('.urun-satir');
+      const sonSatir = satirlar[satirlar.length - 1];
+      
+      if (satir === sonSatir) {
+        const urunSecili = satir.querySelector('.urun-select').value.trim() !== '';
+        const miktarDolu = satir.querySelector('.miktar-input').value.trim() !== '';
+        const fiyatDolu = parseFloat(satir.querySelector('.fiyat-input').value) > 0;
+        
+        if (urunSecili && miktarDolu && fiyatDolu) {
+          document.getElementById('yeniSatirEkle').click();
+        }
+      }
+    });
+    
     // Yeni satırı tabloya ekle
     document.getElementById('urunSatirlar').appendChild(satirTemplate);
+    
+    // Yeni eklenen satırın ürün arama kutusuna odaklan
+    setTimeout(() => {
+      satirTemplate.querySelector('.urun-search').focus();
+    }, 100);
   });
   
   // İlk satır için event listener'ları ekle
@@ -652,7 +706,7 @@ document.addEventListener('DOMContentLoaded', function() {
       noResult.textContent = 'Sonuç bulunamadı';
       urunResults.appendChild(noResult);
     } else {
-      filteredOptions.forEach(option => {
+      filteredOptions.forEach((option, index) => {
         const resultItem = document.createElement('div');
         resultItem.className = 'p-2 text-sm hover:bg-gray-100 cursor-pointer';
         resultItem.textContent = option.textContent;
@@ -660,19 +714,10 @@ document.addEventListener('DOMContentLoaded', function() {
         resultItem.dataset.ad = option.getAttribute('data-ad');
         resultItem.dataset.kod = option.getAttribute('data-kod');
         resultItem.dataset.fiyat = option.getAttribute('data-fiyat');
+        resultItem.dataset.index = index.toString(); // Seçim için index ekliyoruz
         
         resultItem.addEventListener('click', function() {
-          urunSelect.value = this.dataset.id;
-          satir.querySelector('.urun-search').value = this.dataset.ad;
-          satir.querySelector('.selected-urun').textContent = `${this.dataset.ad} (${this.dataset.kod})`;
-          satir.querySelector('.selected-urun').classList.remove('hidden');
-          urunResults.classList.add('hidden');
-          
-          // Fiyatı otomatik doldur
-          const fiyat = this.dataset.fiyat || 0;
-          satir.querySelector('.fiyat-input').value = parseFloat(fiyat).toFixed(2);
-          
-          hesaplaSatirToplam.call(satir.querySelector('.miktar-input'));
+          selectUrun(this, satir);
         });
         
         urunResults.appendChild(resultItem);
@@ -692,6 +737,155 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
+  // Klavye tuş kontrolleri
+  document.addEventListener('keydown', function(e) {
+    // Aktif dropdown
+    const activeDropdown = document.querySelector('.urun-results:not(.hidden)');
+    if (!activeDropdown) return;
+    
+    const satir = activeDropdown.closest('tr');
+    const searchInput = activeDropdown.previousElementSibling;
+    const options = activeDropdown.querySelectorAll('div:not(.text-gray-500)');
+    
+    if (options.length === 0) return;
+    
+    // Şu anda seçili olan öğe
+    let selectedIndex = Array.from(options).findIndex(option => option.classList.contains('bg-gray-100'));
+    if (selectedIndex === -1) selectedIndex = 0;
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        // Önceki seçileni temizle
+        if (selectedIndex >= 0) 
+          options[selectedIndex].classList.remove('bg-gray-100');
+        
+        // Sonraki öğeye geç (sona geldiyse başa dön)
+        selectedIndex = (selectedIndex + 1) % options.length;
+        options[selectedIndex].classList.add('bg-gray-100');
+        options[selectedIndex].scrollIntoView({ block: 'nearest' });
+        break;
+        
+      case 'ArrowUp':
+        e.preventDefault();
+        // Önceki seçileni temizle
+        if (selectedIndex >= 0) 
+          options[selectedIndex].classList.remove('bg-gray-100');
+        
+        // Önceki öğeye geç (baştaysa sona git)
+        selectedIndex = (selectedIndex - 1 + options.length) % options.length;
+        options[selectedIndex].classList.add('bg-gray-100');
+        options[selectedIndex].scrollIntoView({ block: 'nearest' });
+        break;
+        
+      case 'Enter':
+        e.preventDefault();
+        if (selectedIndex >= 0) {
+          selectUrun(options[selectedIndex], satir);
+        }
+        break;
+        
+      case 'Escape':
+        e.preventDefault();
+        activeDropdown.classList.add('hidden');
+        break;
+    }
+  });
+  
+  // Seçilen ürünü işleme fonksiyonu
+  function selectUrun(selectedOption, satir) {
+    const urunSelect = satir.querySelector('.urun-select');
+    const urunResults = satir.querySelector('.urun-results');
+    const urunSearch = satir.querySelector('.urun-search');
+    
+    urunSelect.value = selectedOption.dataset.id;
+    urunSearch.value = selectedOption.dataset.ad;
+    satir.querySelector('.selected-urun').textContent = `${selectedOption.dataset.ad} (${selectedOption.dataset.kod})`;
+    satir.querySelector('.selected-urun').classList.remove('hidden');
+    urunResults.classList.add('hidden');
+    
+    // Fiyatı otomatik doldur
+    const fiyat = selectedOption.dataset.fiyat || 0;
+    satir.querySelector('.fiyat-input').value = parseFloat(fiyat).toFixed(2);
+    
+    // Miktar alanına odaklan
+    setTimeout(() => {
+      satir.querySelector('.miktar-input').focus();
+      satir.querySelector('.miktar-input').select();
+    }, 100);
+    
+    hesaplaSatirToplam.call(satir.querySelector('.miktar-input'));
+  }
+  
+  // Tab tuşuyla akıllı geçiş
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      const activeElement = document.activeElement;
+      
+      // Son satırın son inputu ise ve tab'a basıldıysa
+      if (!e.shiftKey && activeElement.classList.contains('fiyat-input')) {
+        const satirlar = document.querySelectorAll('.urun-satir');
+        const sonSatir = satirlar[satirlar.length - 1];
+        
+        if (activeElement === sonSatir.querySelector('.fiyat-input')) {
+          // Bu satırdaki tüm bilgiler dolu mu kontrol et
+          const urunSecili = sonSatir.querySelector('.urun-select').value.trim() !== '';
+          const miktarDolu = sonSatir.querySelector('.miktar-input').value.trim() !== '';
+          const fiyatDolu = sonSatir.querySelector('.fiyat-input').value.trim() !== '' && 
+                           parseFloat(sonSatir.querySelector('.fiyat-input').value) > 0;
+          
+          if (urunSecili && miktarDolu && fiyatDolu) {
+            e.preventDefault(); // Tab'ın varsayılan davranışını engelle
+            
+            // Yeni satır ekle
+            document.getElementById('yeniSatirEkle').click();
+            
+            // Yeni eklenen satırın ürün arama kutusuna odaklan
+            setTimeout(() => {
+              const yeniSatir = document.querySelectorAll('.urun-satir')[satirlar.length];
+              if (yeniSatir) {
+                yeniSatir.querySelector('.urun-search').focus();
+              }
+            }, 100);
+          }
+        }
+      }
+    }
+  });
+  
+  // Tab sonrası miktar ve fiyat alanlarındaki otomatik seçim
+  document.querySelectorAll('.miktar-input, .fiyat-input').forEach(input => {
+    input.addEventListener('focus', function() {
+      this.select(); // Alandaki mevcut değeri seç
+    });
+  });
+  
+  // İlk satır için tab tuşuna basıldığında event listener'ları ekle
+  document.querySelectorAll('.urun-satir').forEach(satir => {
+    const urunSearch = satir.querySelector('.urun-search');
+    const miktarInput = satir.querySelector('.miktar-input');
+    const fiyatInput = satir.querySelector('.fiyat-input');
+    
+    // Tab tuşu davranışlarını ele al
+    [urunSearch, miktarInput, fiyatInput].forEach(input => {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          // Tab'a basıldığında seçili öğe varsa ve dropdown açıksa seçimi yap
+          if (input === urunSearch && !e.shiftKey) {
+            const dropdown = satir.querySelector('.urun-results');
+            if (!dropdown.classList.contains('hidden')) {
+              const selectedOption = dropdown.querySelector('.bg-gray-100');
+              if (selectedOption) {
+                e.preventDefault();
+                selectUrun(selectedOption, satir);
+              }
+            }
+          }
+        }
+      });
+    });
+  });
+  
   // Satır toplamını hesapla
   function hesaplaSatirToplam() {
     const satir = this.closest('tr');
@@ -702,6 +896,28 @@ document.addEventListener('DOMContentLoaded', function() {
     satir.querySelector('.satir-toplam').textContent = toplam.toFixed(2);
     
     hesaplaGenelToplam();
+    
+    // Eğer bu son satır ise ve tüm bilgiler doluysa
+    if (this.classList.contains('fiyat-input')) {
+      const satirlar = document.querySelectorAll('.urun-satir');
+      const sonSatir = satirlar[satirlar.length - 1];
+      
+      if (satir === sonSatir) {
+        const urunSecili = satir.querySelector('.urun-select').value.trim() !== '';
+        const miktarDolu = satir.querySelector('.miktar-input').value.trim() !== '';
+        const fiyatDolu = satir.querySelector('.fiyat-input').value.trim() !== '' && 
+                         parseFloat(satir.querySelector('.fiyat-input').value) > 0;
+        
+        // Tüm veriler girdiyse otomatik yeni satır ekle
+        if (urunSecili && miktarDolu && fiyatDolu) {
+          // Son satır dolduğunda ve son inputtan çıkıldığında otomatik yeni satır ekle
+          this.addEventListener('blur', function onBlur() {
+            document.getElementById('yeniSatirEkle').click();
+            this.removeEventListener('blur', onBlur); // Event listener'ı kaldır
+          }, { once: true });
+        }
+      }
+    }
   }
   
   // Genel toplamı hesapla
