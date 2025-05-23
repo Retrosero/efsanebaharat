@@ -640,7 +640,7 @@ try {
               $tutarPrefix = $hareket['tur'] === 'Satis' || $hareket['tur'] === 'tediye' ? '-' : '+';
               $detayUrl = $hareket['tur'] === 'Satis' ? "fatura_detay.php?id={$hareket['rec_id']}" : 
                          ($hareket['tur'] === 'Alis' ? "fatura_detay.php?id={$hareket['rec_id']}" : 
-                         ($hareket['tur'] === 'tediye' ? "tediye_detay.php?id={$hareket['rec_id']}" : "tahsilat_detay.php?id={$hareket['rec_id']}"));
+                         ($hareket['tur'] === 'tediye' ? "tediye_makbuz.php?id={$hareket['rec_id']}" : "tahsilat_detay.php?id={$hareket['rec_id']}"));
               
               // Para birimi sembollerini ekle
               $paraBirimiSembol = '₺';

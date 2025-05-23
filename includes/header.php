@@ -369,6 +369,7 @@ if (!in_array($current_page, $exempt_pages)) {
       </a>
       <?php endif; ?>
       
+      
       <?php if (sayfaErisimKontrol($pdo, 'ayarlar.php')): ?>
       <a href="ayarlar.php" class="<?= basename($_SERVER['PHP_SELF']) == 'ayarlar.php' ? 'active' : '' ?>">
         <i class="ri-settings-line"></i>
@@ -423,6 +424,8 @@ if (!in_array($current_page, $exempt_pages)) {
           <span class="nav-text">Tahsilat</span>
         </a>
         <?php endif; ?>
+        
+
         
         <?php if (sayfaErisimKontrol($pdo, 'urunler.php')): ?>
         <a href="urunler.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Ürünler">

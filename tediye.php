@@ -105,6 +105,38 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             $pdo->commit();
             $successMessage = 'Tediye başarıyla kaydedildi.';
 
+            // Müşteri bilgilerini al
+            $stmtMusteri = $pdo->prepare("
+                SELECT m.*, CONCAT('MUS', LPAD(m.id, 6, '0')) as musteri_kodu 
+                FROM musteriler m 
+                WHERE m.id = :mid
+            ");
+            $stmtMusteri->execute([':mid' => $selectedMusteriID]);
+            $musteriDetay = $stmtMusteri->fetch(PDO::FETCH_ASSOC);
+
+            // Güncel bakiyeyi hesapla
+            require_once 'guncelbakiye.php';
+            $eskiBakiye = hesaplaGuncelBakiye($pdo, $selectedMusteriID) - $tutar; // Tediye öncesi bakiye
+            $yeniBakiye = hesaplaGuncelBakiye($pdo, $selectedMusteriID); // Tediye sonrası bakiye
+
+            // JavaScript ile makbuz önizleme modalını göster
+            echo "<script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    showMakbuzPreview({
+                        id: " . $odeme_id . ",
+                        evrakNo: '" . $evrakNo . "',
+                        musteriAd: '" . addslashes($musteriDetay['ad'] . ' ' . $musteriDetay['soyad']) . "',
+                        cariKod: '" . addslashes($musteriDetay['musteri_kodu']) . "',
+                        tutar: " . $tutar . ",
+                        odemeTuru: '" . ucfirst($tediyeTuru) . "',
+                        tarih: '" . date('d.m.Y', strtotime($islemTarihi)) . "',
+                        aciklama: '" . addslashes($aciklama) . "',
+                        eskiBakiye: " . $eskiBakiye . ",
+                        yeniBakiye: " . $yeniBakiye . "
+                    });
+                });
+            </script>";
+
         } catch(Exception $ex){
             $pdo->rollBack();
             $errorMessage = "Kaydetme hatası: " . $ex->getMessage();
@@ -583,7 +615,212 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 });
+
+// Para formatı
+function formatCurrency(amount) {
+    const absAmount = Math.abs(amount);
+    const formatted = new Intl.NumberFormat('tr-TR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(absAmount);
+    
+    return formatted + ' ₺';
+}
+
+// Ödeme detayı
+function getOdemeDetayi(data) {
+    switch(data.odemeTuru) {
+        case 'kredi':
+            return data.krediKartBanka || 'Kredi Kartı';
+        case 'havale':
+            return data.havaleBanka || 'Havale/EFT';
+        case 'cek':
+            return `Çek No: ${data.cekNo || '-'} / Vade: ${data.cekVade || '-'}`;
+        case 'senet':
+            return `Senet No: ${data.senetNo || '-'} / Vade: ${data.senetVade || '-'}`;
+        default:
+            return 'Nakit Ödeme';
+    }
+}
+
+// Makbuz önizleme fonksiyonu
+function showMakbuzPreview(data) {
+    // Modal elementlerini seç
+    const modal = document.getElementById('makbuzModal');
+    const belgeNo = document.getElementById('makbuzBelgeNo');
+    const musteri = document.getElementById('makbuzMusteri');
+    const cariKod = document.getElementById('makbuzCariKod');
+    const tarih = document.getElementById('makbuzTarih');
+    const odemeTipi = document.getElementById('makbuzOdemeTipi');
+    const odemeDetaylari = document.getElementById('makbuzOdemeDetaylari');
+    const toplamTutar = document.getElementById('makbuzToplamTutar');
+    const aciklama = document.getElementById('makbuzAciklama');
+    const oncekiBakiye = document.getElementById('makbuzOncekiBakiye');
+    const tediyeTutari = document.getElementById('makbuzTahsilatTutari');
+    const guncelBakiye = document.getElementById('makbuzGuncelBakiye');
+    
+    // Verileri doldur
+    if (belgeNo) belgeNo.textContent = data.evrakNo || '-';
+    if (musteri) musteri.textContent = data.musteriAd || '-';
+    if (cariKod) cariKod.textContent = data.cariKod || '-';
+    if (tarih) tarih.textContent = data.tarih || '-';
+    if (odemeTipi) odemeTipi.textContent = data.odemeTuru || '-';
+    if (toplamTutar) toplamTutar.textContent = formatCurrency(data.tutar);
+    if (aciklama) aciklama.textContent = data.aciklama || '-';
+    
+    // Bakiye bilgilerini doldur
+    if (oncekiBakiye) {
+        oncekiBakiye.textContent = formatCurrency(data.eskiBakiye);
+        oncekiBakiye.className = 'font-medium mt-1 ' + (data.eskiBakiye > 0 ? 'text-red-600' : data.eskiBakiye < 0 ? 'text-green-600' : '');
+    }
+    if (tediyeTutari) {
+        tediyeTutari.textContent = formatCurrency(data.tutar);
+    }
+    if (guncelBakiye) {
+        guncelBakiye.textContent = formatCurrency(data.yeniBakiye);
+        guncelBakiye.className = 'font-medium mt-1 ' + (data.yeniBakiye > 0 ? 'text-red-600' : data.yeniBakiye < 0 ? 'text-green-600' : '');
+    }
+    
+    // Ödeme detayları tablosunu doldur
+    if (odemeDetaylari) {
+        let detayHTML = `
+            <tr>
+                <td class="py-2 px-6">${data.odemeTuru}</td>
+                <td class="py-2 px-6">${getOdemeDetayi(data)}</td>
+                <td class="py-2 px-6 text-right">${formatCurrency(data.tutar)}</td>
+            </tr>
+        `;
+        odemeDetaylari.innerHTML = detayHTML;
+    }
+    
+    // Modalı göster
+    if (modal) {
+        modal.classList.remove('hidden');
+        
+        // Yazdır butonu
+        const yazdirBtn = document.getElementById('makbuzYazdirBtn');
+        if (yazdirBtn) {
+            yazdirBtn.onclick = () => {
+                // Tediye makbuzunu açmak için düzenlendi
+                window.open(`tediye_makbuz.php?id=${data.id}`, '_blank');
+            };
+        }
+        
+        // Kapat butonu
+        const kapatBtn = document.getElementById('makbuzKapatBtn');
+        if (kapatBtn) {
+            kapatBtn.onclick = () => {
+                modal.classList.add('hidden');
+            };
+        }
+    }
+}
 </script>
+
+<!-- Makbuz Modal -->
+<div id="makbuzModal" class="fixed inset-0 z-50 overflow-auto bg-gray-500 bg-opacity-75 flex items-center justify-center hidden print:flex print:bg-white">
+  <div class="modal-content bg-white rounded-lg shadow-xl mx-auto my-8 w-full max-w-4xl print:shadow-none print:w-full print:max-w-full print:m-0 print:rounded-none">
+    <!-- Yazdırma görünümü -->
+    <div class="relative p-6 print:p-0">
+      <!-- Modal Başlık ve Kapat Butonu -->
+      <div class="flex justify-between items-center mb-6 print:hidden">
+        <h2 class="text-2xl font-bold text-gray-800">Tediye Makbuzu</h2>
+        <div class="flex space-x-2">
+          <button id="makbuzYazdirBtn" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            <i class="ri-printer-line mr-2"></i> Yazdır
+          </button>
+          <button id="makbuzKapatBtn" class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300">
+            <i class="ri-close-line"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Makbuz İçeriği -->
+      <div class="border p-6 rounded-lg print:border-0 print:rounded-none print:p-4">
+        <!-- Makbuz Başlık -->
+        <div class="flex flex-col md:flex-row justify-between mb-6 pb-4 border-b">
+          <div class="mb-4 md:mb-0">
+            <h1 class="text-2xl font-bold text-gray-900">Efsane Baharat</h1>
+            <p class="text-gray-600">Baharatlar & Kuruyemişler</p>
+          </div>
+          <div class="text-right">
+            <h2 class="text-xl font-bold text-primary">TEDİYE MAKBUZU</h2>
+            <p class="text-gray-600">Belge No: <span id="makbuzBelgeNo" class="font-semibold"></span></p>
+          </div>
+        </div>
+        
+        <!-- Müşteri Bilgileri -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-2">MÜŞTERİ BİLGİLERİ</h3>
+            <p class="mb-1"><span class="font-medium">Müşteri:</span> <span id="makbuzMusteri"></span></p>
+            <p class="mb-1"><span class="font-medium">Cari Kodu:</span> <span id="makbuzCariKod"></span></p>
+          </div>
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-2">TEDİYE BİLGİLERİ</h3>
+            <p class="mb-1"><span class="font-medium">Tarih:</span> <span id="makbuzTarih"></span></p>
+            <p class="mb-1"><span class="font-medium">Ödeme Tipi:</span> <span id="makbuzOdemeTipi"></span></p>
+          </div>
+        </div>
+        
+        <!-- Ödeme Detayları -->
+        <div class="mb-6">
+          <h3 class="font-semibold text-gray-700 mb-2">ÖDEME DETAYLARI</h3>
+          <div class="border rounded overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ödeme Tipi</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detay</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tutar</th>
+                </tr>
+              </thead>
+              <tbody id="makbuzOdemeDetaylari" class="bg-white divide-y divide-gray-200">
+                <!-- JS ile doldurulacak -->
+              </tbody>
+              <tfoot class="bg-gray-50">
+                <tr>
+                  <td class="px-6 py-3"></td>
+                  <td class="px-6 py-3 text-right font-semibold text-gray-700">Toplam Tutar:</td>
+                  <td id="makbuzToplamTutar" class="px-6 py-3 text-right font-bold"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Açıklama -->
+        <div class="mb-6">
+          <h3 class="font-semibold text-gray-700 mb-2">AÇIKLAMA</h3>
+          <div class="bg-gray-50 p-3 rounded">
+            <p id="makbuzAciklama" class="text-gray-700">-</p>
+          </div>
+        </div>
+        
+        <!-- Bakiye Bilgileri -->
+        <div class="mb-6">
+          <h3 class="font-semibold text-gray-700 mb-2">BAKİYE BİLGİLERİ</h3>
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-gray-50 p-3 rounded text-center">
+              <p class="text-sm text-gray-600">Önceki Bakiye</p>
+              <p id="makbuzOncekiBakiye" class="font-medium mt-1">0,00 ₺</p>
+            </div>
+            <div class="bg-gray-50 p-3 rounded text-center">
+              <p class="text-sm text-gray-600">Tediye Tutarı</p>
+              <p id="makbuzTahsilatTutari" class="font-medium mt-1">0,00 ₺</p>
+            </div>
+            <div class="bg-gray-50 p-3 rounded text-center">
+              <p class="text-sm text-gray-600">Güncel Bakiye</p>
+              <p id="makbuzGuncelBakiye" class="font-medium mt-1">0,00 ₺</p>
+            </div>
+          </div>
+        </div>
+        
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <?php
 include 'includes/footer.php'; // menü kapanış + scriptler
