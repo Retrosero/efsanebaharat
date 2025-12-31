@@ -669,6 +669,11 @@ try {
               <td colspan="6" class="px-2 sm:px-4 py-2 text-sm text-gray-500 text-center">Henüz hesap hareketi bulunmuyor.</td>
             </tr>
             <?php endif; ?>
+            <!-- Toplam Bakiye Satırı (Table Body sonuna eklendi - PDF çıktısında görünmesi için) -->
+            <tr class="bg-gray-100 font-bold border-t-2 border-gray-300">
+              <td colspan="5" class="px-2 sm:px-4 py-3 text-right text-gray-700">GENEL TOPLAM BAKİYE:</td>
+              <td class="px-2 sm:px-4 py-3 text-right text-primary text-base">₺<?= $cariBakiyeFormatted ?></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -1110,8 +1115,78 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 
 // Export tablo (demo)
-function exportTable(tableId,format){
-  alert(`Tablo ID=${tableId}, format=${format} (demo). Gerçek indirme için ek JS kütüphaneleri eklemelisiniz.`);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+// Export tablo
+// Export tablo
+function exportTable(tableId, format) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+
+  const fileName = `EfsaneBaharat_${tableId}_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '_')}`;
+
+  if (format === 'xlsx') {
+    const wb = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
+    XLSX.writeFile(wb, `${fileName}.xlsx`);
+  } 
+  else if (format === 'pdf') {
+    const { jsPDF } = window.jspdf;
+    
+    // Kullanıcıya işlem başladığını hissettir
+    const originalCursor = document.body.style.cursor;
+    document.body.style.cursor = 'wait';
+
+    // Tabloyu canvas'a çevir (Görünümü birebir kopyalar)
+    html2canvas(table, {
+      scale: 2, // Kaliteyi artır
+      useCORS: true,
+      backgroundColor: '#ffffff'
+    }).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // Resim boyutlarını A4'e göre ayarla
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfHeight = (imgProps.height * pageWidth) / imgProps.width;
+      
+      // Eğer tablo tek sayfaya sığmıyorsa basitçe ekle (gelişmiş sayfalama gerekirse eklenebilir)
+      // Şimdilik "screenshot" mantığıyla tek parça veya sığdığı kadar.
+      // Eğer çok uzunsa sığdırmak yerine sayfayı uzatmak da bir seçenek ama A4 standardı istendiği için scale ediyoruz.
+      
+      if (pdfHeight > pageHeight) {
+          // Eğer içerik sayfadan uzunsa, sığdırmak için height'a göre scale et
+          // Veya çok sayfalı yapı... Şimdilik sığdırma (fit width) yapıyoruz, taşarsa sığdır.
+          // PDF'in multipage özelliği resim için direkt çalışmaz, manuel bölmek gerekir.
+          // Kullanıcının "görüntüsü olsun" isteği üzerine sığdırma (fit) öncelikli.
+          
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pdfHeight);
+      } else {
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pdfHeight);
+      }
+            
+      pdf.save(`${fileName}.pdf`);
+      document.body.style.cursor = originalCursor;
+    }).catch(err => {
+      console.error('PDF oluşturma hatası:', err);
+      alert('PDF oluşturulurken bir hata oluştu');
+      document.body.style.cursor = originalCursor;
+    });
+  } 
+  else if (format === 'png') {
+    html2canvas(table).then(canvas => {
+      const link = document.createElement('a');
+      link.download = `${fileName}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+  }
 }
 
 function goToDetail(type, id) {

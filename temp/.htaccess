@@ -1,0 +1,2 @@
+# Geçici dosya dizinine web erişimini engelle
+Deny from all
