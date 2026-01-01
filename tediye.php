@@ -24,7 +24,15 @@ $selectedMusteriID = isset($_GET['musteri_id']) ? $_GET['musteri_id'] : null;
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $selectedMusteriID = $_POST['musteri_id']      ?? null;
     $tediyeTuru       = $_POST['tediye_turu']      ?? 'nakit';
-    $tutar            = floatval($_POST['tutar']   ?? 0);
+    // Tutar formatını düzelt
+    $tutarRaw = $_POST['tutar'] ?? '0';
+    // Eğer virgül varsa (örn: 1.250,50), TR formatı varsay
+    if (strpos($tutarRaw, ',') !== false) {
+        $tutarRaw = str_replace('.', '', $tutarRaw);
+        $tutarRaw = str_replace(',', '.', $tutarRaw);
+    }
+    // Aksi halde (44.40), nokta ondalık ayracı olarak kabul edilir
+    $tutar = floatval($tutarRaw);
     $islemTarihi      = $_POST['tarih']            ?? date('Y-m-d');
     
     // Yeni eklenen alanlar

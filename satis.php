@@ -334,6 +334,17 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
             </div>
           </div>
           
+          <!-- Satış Tarihi Alanı -->
+          <div class="mt-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1">İşlem Tarihi</label>
+            <input 
+              type="date" 
+              id="saleDate" 
+              class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value="<?php echo date('Y-m-d'); ?>"
+            >
+          </div>
+          
           <!-- Toplam Bilgileri -->
           <div class="space-y-2 mt-3">
             <div class="flex items-center justify-between">
@@ -2101,11 +2112,14 @@ function completeOrder(){
   }
   const discountRate= parseFloat(document.getElementById('discountRate').value)||0;
   const note= document.getElementById('orderNote').value||'';
+  const saleDate = document.getElementById('saleDate').value || new Date().toISOString().split('T')[0];
+  
   const postData={
     musteri_id: selectedCustomer.id,
     items: cart,
     discountRate,
-    note
+    note,
+    saleDate
   };
 
   fetch('satis_kaydet.php',{

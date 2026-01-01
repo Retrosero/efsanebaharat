@@ -628,9 +628,14 @@ try {
               <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Para Birimi</th>
               <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Açıklama</th>
               <th class="px-2 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tutar</th>
+              <th class="px-2 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Bakiye</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
+            <?php 
+            // Başlangıç bakiyesi (toplam cari bakiye)
+            $runningBalance = $cariBakiye;
+            ?>
             <?php foreach($hesapHareketleri as $hareket): ?>
             <?php 
               $islemTarihi = date('d.m.Y', strtotime($hareket['islem_tarihi']));
@@ -653,6 +658,19 @@ try {
               if ($hareket['para_birimi'] === 'USD') $paraBirimiText = 'Amerikan Doları';
               else if ($hareket['para_birimi'] === 'EUR') $paraBirimiText = 'Euro';
               else if ($hareket['para_birimi'] === 'GBP') $paraBirimiText = 'İngiliz Sterlini';
+
+              // Bu satır için bakiye (işlem sonrası bakiye)
+              $currentRowBalance = $runningBalance;
+              $bakiyeClass = $currentRowBalance >= 0 ? 'text-red-600' : 'text-green-600'; // Borçlu (Pozitif) -> Kırmızı, Alacaklı (Negatif) -> Yeşil
+
+              // Bir sonraki iterasyon için bakiyeyi güncelle (Geriye doğru hesaplama)
+              // Satış/Tediye bakiyeyi artırır (+), Alış/Tahsilat azaltır (-)
+              // Geriye giderken tam tersini yapmalıyız
+              if ($hareket['tur'] === 'Satis' || $hareket['tur'] === 'tediye') {
+                  $runningBalance -= $hareket['tutar'];
+              } else {
+                  $runningBalance += $hareket['tutar'];
+              }
             ?>
             <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='<?= $detayUrl ?>'">
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= $islemTarihi ?></td>
@@ -661,17 +679,18 @@ try {
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= $paraBirimiText ?> (<?= $paraBirimiSembol ?>)</td>
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= htmlspecialchars($hareket['aciklama']) ?></td>
               <td class="px-2 sm:px-4 py-2 text-sm font-medium <?= $tutarClass ?> text-right"><?= $tutarPrefix ?><?= $tutarFormatted ?> <?= $paraBirimiSembol ?></td>
+              <td class="px-2 sm:px-4 py-2 text-sm font-medium <?= $bakiyeClass ?> text-right"><?= number_format($currentRowBalance, 2, ',', '.') ?> <?= $paraBirimiSembol ?></td>
             </tr>
             <?php endforeach; ?>
             
             <?php if(empty($hesapHareketleri)): ?>
             <tr>
-              <td colspan="6" class="px-2 sm:px-4 py-2 text-sm text-gray-500 text-center">Henüz hesap hareketi bulunmuyor.</td>
+              <td colspan="7" class="px-2 sm:px-4 py-2 text-sm text-gray-500 text-center">Henüz hesap hareketi bulunmuyor.</td>
             </tr>
             <?php endif; ?>
             <!-- Toplam Bakiye Satırı (Table Body sonuna eklendi - PDF çıktısında görünmesi için) -->
             <tr class="bg-gray-100 font-bold border-t-2 border-gray-300">
-              <td colspan="5" class="px-2 sm:px-4 py-3 text-right text-gray-700">GENEL TOPLAM BAKİYE:</td>
+              <td colspan="6" class="px-2 sm:px-4 py-3 text-right text-gray-700">GENEL TOPLAM BAKİYE:</td>
               <td class="px-2 sm:px-4 py-3 text-right text-primary text-base">₺<?= $cariBakiyeFormatted ?></td>
             </tr>
           </tbody>

@@ -29,10 +29,12 @@ $musteri_id  = $postData['musteri_id'] ?? null;
 $items       = $postData['items']      ?? [];
 $discountRate= floatval($postData['discountRate']??0);
 $note        = $postData['note']       ?? '';
+$saleDate    = $postData['saleDate']   ?? date('Y-m-d');
 
 error_log("Müşteri ID: " . $musteri_id);
 error_log("Ürün sayısı: " . count($items));
 error_log("İndirim oranı: " . $discountRate);
+error_log("İşlem Tarihi: " . $saleDate);
 
 // Basit kontrol
 if(!$musteri_id || empty($items)){
@@ -115,7 +117,7 @@ try {
                 created_at, onay_durumu, onayli
         ) VALUES(
                 'satis', :mid, :toplam, 'odenmedi',
-                CURDATE(), :kullanici_id, :iskonto, :net_toplam, :net_toplam,
+                :saleDate, :kullanici_id, :iskonto, :net_toplam, :net_toplam,
                 NOW(), 'onaylandi', 1
         )
     ");
@@ -125,7 +127,8 @@ try {
         ':toplam' => $araToplam,
         ':iskonto' => $iskonto,
         ':net_toplam' => $netToplam,
-        ':kullanici_id' => $_SESSION['kullanici_id']
+        ':kullanici_id' => $_SESSION['kullanici_id'],
+        ':saleDate' => $saleDate
     ]);
         
     $fatura_id = $pdo->lastInsertId();

@@ -49,8 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 UPDATE odeme_tahsilat 
                 SET tutar = :tutar,
                     odeme_yontemi = :odeme_yontemi,
-                    islem_tarihi = :islem_tarihi,
-                    updated_at = NOW()
+                    islem_tarihi = :islem_tarihi
                 WHERE id = :id
             ");
             
