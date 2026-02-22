@@ -199,6 +199,16 @@ mark {
           
           <!-- Ürün Ekle Butonu -->
           <a 
+            href="urunleri_disa_aktar_xml.php"
+            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            target="_blank"
+            title="XML Dışa Aktar"
+          >
+            <i class="ri-file-download-line"></i>
+            <span class="whitespace-nowrap">XML İndir</span>
+          </a>
+          
+          <a 
             href="urun_ekle.php"
             class="flex items-center gap-2 px-4 py-2 text-sm text-white bg-primary rounded-lg hover:bg-primary/90"
           >
@@ -207,11 +217,19 @@ mark {
           </a>
         </div>
 
-        <!-- Mobil için Ürün Ekle Butonu - Ayrı Satırda -->
-        <div class="flex md:hidden w-full">
+        <!-- Mobil için Ürün Ekle ve XML Butonları - Ayrı Satırda -->
+        <div class="flex md:hidden w-full gap-2">
+          <a 
+            href="urunleri_disa_aktar_xml.php"
+            class="w-1/2 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            target="_blank"
+          >
+            <i class="ri-file-download-line"></i>
+            XML İndir
+          </a>
           <a 
             href="urun_ekle.php"
-            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-white bg-primary rounded-lg hover:bg-primary/90"
+            class="w-1/2 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-white bg-primary rounded-lg hover:bg-primary/90"
           >
             <i class="ri-add-line"></i>
             Ürün Ekle
