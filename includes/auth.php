@@ -69,9 +69,6 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
         
         // Önceki oturum verilerini temizle
         $_SESSION = array();
-        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
-            session_regenerate_id(true);
-        }
         
         // Oturumu başlat
         $_SESSION['kullanici_id'] = $kullanici['id'];
