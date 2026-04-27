@@ -69,7 +69,9 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
         
         // Önceki oturum verilerini temizle
         $_SESSION = array();
-        session_regenerate_id(true);
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            session_regenerate_id(true);
+        }
         
         // Oturumu başlat
         $_SESSION['kullanici_id'] = $kullanici['id'];
@@ -99,18 +101,20 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
             $secure = isHttpsRequest();
             
             // Token'ı çereze kaydet
-            setcookie(
-                REMEMBER_COOKIE_NAME,
-                $kullanici['id'] . ':' . $token,
-                [
-                    'expires' => time() + REMEMBER_COOKIE_DURATION,
-                    'path' => '/',
-                    'domain' => '',
-                    'secure' => $secure,
-                    'httponly' => true,
-                    'samesite' => 'Lax'
-                ]
-            );
+            if (!headers_sent()) {
+                setcookie(
+                    REMEMBER_COOKIE_NAME,
+                    $kullanici['id'] . ':' . $token,
+                    [
+                        'expires' => time() + REMEMBER_COOKIE_DURATION,
+                        'path' => '/',
+                        'domain' => '',
+                        'secure' => $secure,
+                        'httponly' => true,
+                        'samesite' => 'Lax'
+                    ]
+                );
+            }
         }
         
         return $kullanici;
@@ -158,18 +162,20 @@ function hatirlamaTokeniKontrol($pdo) {
             $secure = isHttpsRequest();
             
             // Token'ı çereze kaydet (yenile)
-            setcookie(
-                REMEMBER_COOKIE_NAME,
-                $kullanici['id'] . ':' . $token,
-                [
-                    'expires' => time() + REMEMBER_COOKIE_DURATION,
-                    'path' => '/',
-                    'domain' => '',
-                    'secure' => $secure,
-                    'httponly' => true,
-                    'samesite' => 'Lax'
-                ]
-            );
+            if (!headers_sent()) {
+                setcookie(
+                    REMEMBER_COOKIE_NAME,
+                    $kullanici['id'] . ':' . $token,
+                    [
+                        'expires' => time() + REMEMBER_COOKIE_DURATION,
+                        'path' => '/',
+                        'domain' => '',
+                        'secure' => $secure,
+                        'httponly' => true,
+                        'samesite' => 'Lax'
+                    ]
+                );
+            }
             
             return true;
         }
@@ -348,7 +354,6 @@ function checkAuth() {
 
 // Giriş sayfası hariç tüm sayfalarda oturum kontrolü yap
 $current_page = basename($_SERVER['PHP_SELF']);
-if ($current_page != 'giris.php') {
+if ($current_page != 'giris.php' && $current_page != 'login.php') {
     checkAuth();
 }
-?> 
