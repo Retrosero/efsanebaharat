@@ -1134,6 +1134,48 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 
 // Export tablo (demo)
+
+// Satın Alınan Ürünler Arama Fonksiyonu
+document.addEventListener('DOMContentLoaded', function() {
+  const urunlerSearchInput = document.getElementById('urunlerSearch');
+  const urunlerTable = document.getElementById('urunlerTable');
+  const urunlerTbody = document.getElementById('urunlerTbody');
+  
+  if (urunlerSearchInput && urunlerTable) {
+    urunlerSearchInput.addEventListener('input', function(e) {
+      const searchTerm = e.target.value.toLowerCase().trim();
+      const rows = urunlerTbody.querySelectorAll('tr');
+      
+      rows.forEach(row => {
+        // İlk satır "Henüz ürün satın alımı yok" mesajını içeriyor kontrol et
+        const text = row.textContent.toLowerCase();
+        
+        if (text.includes(searchTerm)) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+      
+      // Eğer arama sonucu hiç satır kalmazsa, "Sonuç bulunamadı" mesajı göster
+      const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+      let noResultRow = urunlerTbody.querySelector('.no-result-row');
+      
+      if (visibleRows.length === 0 && searchTerm !== '') {
+        if (!noResultRow) {
+          noResultRow = document.createElement('tr');
+          noResultRow.className = 'no-result-row';
+          noResultRow.innerHTML = '<td colspan="4" class="p-4 text-sm text-gray-500 text-center">Aranan ürün bulunamadı.</td>';
+          urunlerTbody.appendChild(noResultRow);
+        } else {
+          noResultRow.style.display = '';
+        }
+      } else if (noResultRow) {
+        noResultRow.style.display = 'none';
+      }
+    });
+  }
+});
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

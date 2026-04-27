@@ -4,7 +4,6 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 // Session varsa temizleyelim (diğer oturum temizlemeleri için)
-session_regenerate_id(true);
 
 // Eğer kullanıcı zaten giriş yapmışsa ana sayfaya yönlendir
 if (girisYapmisMi()) {
@@ -33,20 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $hata_mesaji = 'E-posta ve şifre alanları zorunludur.';
     } else {
         // Oturumu temizleyelim
-        $_SESSION = array();
-        
-        // Eğer çerez varsa temizle
-        if (ini_get("session.use_cookies")) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000,
-                $params["path"], $params["domain"],
-                $params["secure"], $params["httponly"]
-            );
-        }
-        
-        // Oturumu yenile
-        session_regenerate_id(true);
-        
         // Giriş işlemini dene
         $sonuc = kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla);
         

@@ -1,6 +1,19 @@
 <?php
 // includes/auth.php
 
+function isHttpsRequest() {
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        return true;
+    }
+    if (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+        return true;
+    }
+    if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+        return true;
+    }
+    return false;
+}
+
 // Oturum ayarlarını yapabilmek için önce oturum durumunu kontrol et
 if (session_status() == PHP_SESSION_NONE) {
     // Oturum başlamadan önce ayarları yapabiliriz
@@ -14,8 +27,16 @@ if (session_status() == PHP_SESSION_NONE) {
     ini_set('session.use_only_cookies', 1);
     
     // HTTP/HTTPS kontrolü (development ortamında HTTPS olmayabilir)
-    $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+    $secure = isHttpsRequest();
     ini_set('session.cookie_secure', $secure);
+    session_set_cookie_params([
+        'lifetime' => 365 * 24 * 60 * 60,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $secure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
     
     // Oturumu başlat
     session_start();
@@ -48,6 +69,7 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
         
         // Önceki oturum verilerini temizle
         $_SESSION = array();
+        session_regenerate_id(true);
         
         // Oturumu başlat
         $_SESSION['kullanici_id'] = $kullanici['id'];
@@ -74,7 +96,7 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
             ]);
             
             // HTTP/HTTPS kontrolü (development ortamında HTTPS olmayabilir)
-            $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+            $secure = isHttpsRequest();
             
             // Token'ı çereze kaydet
             setcookie(
@@ -133,7 +155,7 @@ function hatirlamaTokeniKontrol($pdo) {
             $stmt->execute([':id' => $kullanici['id']]);
             
             // HTTP/HTTPS kontrolü (development ortamında HTTPS olmayabilir)
-            $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+            $secure = isHttpsRequest();
             
             // Token'ı çereze kaydet (yenile)
             setcookie(

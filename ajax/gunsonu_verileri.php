@@ -4,7 +4,7 @@ require_once("../includes/db.php");
 require_once("../includes/functions.php");
 
 // Yetki kontrolü
-if (!$_SESSION['user_id'] || !yetkiKontrol('gunsonu', 'goruntuleme')) {
+if (empty($_SESSION['kullanici_id']) || !yetkiKontrol('gunsonu', 'goruntuleme')) {
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => 'Yetkisiz erişim']);
     exit();

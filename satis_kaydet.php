@@ -28,7 +28,7 @@ if(!$postData){
 $musteri_id  = $postData['musteri_id'] ?? null;
 $items       = $postData['items']      ?? [];
 $discountRate= floatval($postData['discountRate']??0);
-$note        = $postData['note']       ?? '';
+$orderNote   = trim((string)($postData['note'] ?? ''));
 $saleDate    = $postData['saleDate']   ?? date('Y-m-d');
 
 error_log("Müşteri ID: " . $musteri_id);
@@ -113,11 +113,11 @@ try {
     $stmtF = $pdo->prepare("
         INSERT INTO faturalar(
                 fatura_turu, musteri_id, toplam_tutar, odeme_durumu,
-                fatura_tarihi, kullanici_id, indirim_tutari, genel_toplam, kalan_tutar,
+                fatura_tarihi, kullanici_id, indirim_tutari, genel_toplam, kalan_tutar, aciklama,
                 created_at, onay_durumu, onayli
         ) VALUES(
                 'satis', :mid, :toplam, 'odenmedi',
-                :saleDate, :kullanici_id, :iskonto, :net_toplam, :net_toplam,
+                :saleDate, :kullanici_id, :iskonto, :net_toplam, :net_toplam, :aciklama,
                 NOW(), 'onaylandi', 1
         )
     ");
@@ -127,6 +127,7 @@ try {
         ':toplam' => $araToplam,
         ':iskonto' => $iskonto,
         ':net_toplam' => $netToplam,
+        ':aciklama' => $orderNote,
         ':kullanici_id' => $_SESSION['kullanici_id'],
         ':saleDate' => $saleDate
     ]);
@@ -142,7 +143,7 @@ try {
             $qty = floatval($item['qty'] ?? 1);
             $price = floatval($item['price'] ?? 0);
             $olcumBirimi = $item['olcumBirimi'] ?? 'adet';
-            $note = $item['note'] ?? '';
+            $itemNote = $item['note'] ?? '';
             
             // Ürün bilgilerini al
             $stmtU = $pdo->prepare("SELECT urun_adi, kdv_orani, olcum_birimi FROM urunler WHERE id = ?");
@@ -205,7 +206,7 @@ try {
                 ':indirim_orani' => $urun_iskonto_orani,
                 ':indirim_tutari' => $urun_iskonto_tutari,
                 ':net' => $net_tutar,
-                ':note' => $note
+                ':note' => $itemNote
             ]);
             
             // 5) Stokları hemen güncelle

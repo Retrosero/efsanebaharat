@@ -1,10 +1,10 @@
 <?php
 // includes/db.php
 
-$host     = 'localhost';
-$dbname   = 'efsaneba_uygulama';  // Örnek veritabanı adı
-$user     = 'efsaneba_serhan';         // DB kullanıcı adı
-$password = 'Aooh8x!!!4189';             // DB şifresi
+$host     = getenv('DB_HOST') ?: 'localhost';
+$dbname   = getenv('DB_NAME') ?: 'efsanebaharat';
+$user     = getenv('DB_USER') ?: 'root';
+$password = getenv('DB_PASS') ?: '';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $password);

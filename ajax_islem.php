@@ -86,6 +86,33 @@ try {
                 
                 if ($fatura) {
                     $pdo->beginTransaction();
+
+                    // Stok iadesi için fatura detaylarını önceden al
+                    $stmtDetaylar = $pdo->prepare("SELECT urun_id, miktar FROM fatura_detaylari WHERE fatura_id = ?");
+                    $stmtDetaylar->execute([$id]);
+                    $faturaDetaylari = $stmtDetaylar->fetchAll(PDO::FETCH_ASSOC);
+
+                    // Fatura türüne göre stokları tersine al
+                    // satış silinince stok geri eklenir, alış silinince stok geri düşülür
+                    if (!empty($faturaDetaylari)) {
+                        $stokOperatoru = ($fatura['fatura_turu'] === 'satis') ? '+' : '-';
+                        $stmtStokGuncelle = $pdo->prepare("
+                            UPDATE urunler
+                            SET stok_miktari = stok_miktari $stokOperatoru :miktar
+                            WHERE id = :urun_id
+                        ");
+
+                        foreach ($faturaDetaylari as $detay) {
+                            $urunId = intval($detay['urun_id'] ?? 0);
+                            $miktar = floatval($detay['miktar'] ?? 0);
+                            if ($urunId > 0 && $miktar > 0) {
+                                $stmtStokGuncelle->execute([
+                                    ':miktar' => $miktar,
+                                    ':urun_id' => $urunId
+                                ]);
+                            }
+                        }
+                    }
                     
                     // Fatura detaylarını sil
                     $stmt = $pdo->prepare("DELETE FROM fatura_detaylari WHERE fatura_id = ?");

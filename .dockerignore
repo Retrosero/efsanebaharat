@@ -1,0 +1,8 @@
+.git
+.gitignore
+.kiro
+node_modules
+tests
+*.log
+temp
+logs

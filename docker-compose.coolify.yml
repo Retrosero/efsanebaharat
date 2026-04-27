@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME:-efsanebaharat}
+      DB_USER: ${DB_USER:-efsanebaharat}
+      DB_PASS: ${DB_PASS:-change_me}
+    depends_on:
+      - db
+    volumes:
+      - uploads_data:/var/www/html/uploads
+      - logs_data:/var/www/html/logs
+      - temp_data:/var/www/html/temp
+    ports:
+      - "8080:80"
+
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_turkish_ci
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-efsanebaharat}
+      MYSQL_USER: ${DB_USER:-efsanebaharat}
+      MYSQL_PASSWORD: ${DB_PASS:-change_me}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-root_change_me}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./efsanebaharat.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+
+volumes:
+  db_data:
+  uploads_data:
+  logs_data:
+  temp_data:

@@ -11,7 +11,12 @@ ini_set('session.gc_maxlifetime', $session_lifetime);
 ini_set('session.cookie_lifetime', $session_lifetime);
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
+ini_set(
+    'session.cookie_secure',
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
+    || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+);
 
 session_start();
 
@@ -42,10 +47,10 @@ if (!in_array($current_page, $public_pages) && !girisYapmisMi()) {
 */
 
 // Veritabanı bağlantı bilgileri
-define('DB_HOST', 'localhost');
-define('DB_USER', 'efsaneba_serhan');  // cPanel Kullanıcı Adın
-define('DB_PASS', 'Aooh8x!!!4189');       // cPanel Şifren
-define('DB_NAME', 'efsaneba_uygulama');  // cPanel Veritabanı Adın
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'efsanebaharat');
 
 // Zaman dilimi ayarı
 date_default_timezone_set('Europe/Istanbul');

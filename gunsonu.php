@@ -15,94 +15,142 @@ try {
     $tahsilatToplam = ['TRY' => 0, 'USD' => 0, 'EUR' => 0, 'GBP' => 0];
     $odemeToplam = ['TRY' => 0, 'USD' => 0, 'EUR' => 0, 'GBP' => 0];
     
-    // Satış Faturaları
-    $stmtSatis = $pdo->prepare("
-        SELECT f.*, m.ad as musteri_ad, m.soyad as musteri_soyad,
-               k.kullanici_adi as kaydeden, f.para_birimi
-        FROM faturalar f
-        LEFT JOIN musteriler m ON f.musteri_id = m.id
-        LEFT JOIN kullanicilar k ON f.kullanici_id = k.id
-        WHERE f.fatura_turu = 'satis' 
-        AND DATE(f.created_at) = ?
-        ORDER BY f.created_at DESC
-    ");
-    $stmtSatis->execute([$selectedDate]);
-    $satislar = $stmtSatis->fetchAll(PDO::FETCH_ASSOC);
+    $satislar = [];
+    $alislar = [];
+    $tahsilatlar = [];
+    $odemeler = [];
+    
+    // Satış Faturaları - para_birimi ve onay_durumu varsa sorgula, yoksa basit sorgu
+    try {
+        $stmtSatis = $pdo->prepare("
+            SELECT f.*, m.ad as musteri_ad, m.soyad as musteri_soyad,
+                   k.kullanici_adi as kaydeden
+            FROM faturalar f
+            LEFT JOIN musteriler m ON f.musteri_id = m.id
+            LEFT JOIN kullanicilar k ON f.kullanici_id = k.id
+            WHERE f.fatura_turu = 'satis' 
+            AND DATE(f.created_at) = ?
+            ORDER BY f.created_at DESC
+        ");
+        $stmtSatis->execute([$selectedDate]);
+        $satislar = $stmtSatis->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Her satışa para_birimi ve onay_durumu ekle (varsayılan değerler)
+        foreach ($satislar as &$satis) {
+            $satis['para_birimi'] = $satis['para_birimi'] ?? 'TRY';
+            $satis['onay_durumu'] = $satis['onay_durumu'] ?? 'bekliyor';
+        }
+    } catch(PDOException $e) {
+        error_log("Satış sorgusu hatası: " . $e->getMessage());
+    }
 
     // Alış Faturaları
-    $stmtAlis = $pdo->prepare("
-        SELECT f.*, t.firma_adi as tedarikci_ad,
-               k.kullanici_adi as kaydeden, f.para_birimi
-        FROM faturalar f
-        LEFT JOIN tedarikciler t ON f.tedarikci_id = t.id
-        LEFT JOIN kullanicilar k ON f.kullanici_id = k.id
-        WHERE f.fatura_turu = 'alis' 
-        AND DATE(f.created_at) = ?
-        ORDER BY f.created_at DESC
-    ");
-    $stmtAlis->execute([$selectedDate]);
-    $alislar = $stmtAlis->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmtAlis = $pdo->prepare("
+            SELECT f.*, t.firma_adi as tedarikci_ad,
+                   k.kullanici_adi as kaydeden
+            FROM faturalar f
+            LEFT JOIN tedarikciler t ON f.tedarikci_id = t.id
+            LEFT JOIN kullanicilar k ON f.kullanici_id = k.id
+            WHERE f.fatura_turu = 'alis' 
+            AND DATE(f.created_at) = ?
+            ORDER BY f.created_at DESC
+        ");
+        $stmtAlis->execute([$selectedDate]);
+        $alislar = $stmtAlis->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Her alışa para_birimi ve onay_durumu ekle
+        foreach ($alislar as &$alis) {
+            $alis['para_birimi'] = $alis['para_birimi'] ?? 'TRY';
+            $alis['onay_durumu'] = $alis['onay_durumu'] ?? 'bekliyor';
+        }
+    } catch(PDOException $e) {
+        error_log("Alış sorgusu hatası: " . $e->getMessage());
+    }
 
     // Tahsilatlar
-    $stmtTahsilat = $pdo->prepare("
-        SELECT ot.*, m.ad as musteri_ad, m.soyad as musteri_soyad,
-               k.kullanici_adi as kaydeden, 'TRY' as para_birimi
-        FROM odeme_tahsilat ot
-        LEFT JOIN musteriler m ON ot.musteri_id = m.id
-        LEFT JOIN kullanicilar k ON ot.kullanici_id = k.id
-        WHERE ot.islem_turu = 'tahsilat'
-        AND DATE(ot.created_at) = ?
-        ORDER BY ot.created_at DESC
-    ");
-    $stmtTahsilat->execute([$selectedDate]);
-    $tahsilatlar = $stmtTahsilat->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmtTahsilat = $pdo->prepare("
+            SELECT ot.*, m.ad as musteri_ad, m.soyad as musteri_soyad,
+                   k.kullanici_adi as kaydeden
+            FROM odeme_tahsilat ot
+            LEFT JOIN musteriler m ON ot.musteri_id = m.id
+            LEFT JOIN kullanicilar k ON ot.kullanici_id = k.id
+            WHERE ot.islem_turu = 'tahsilat'
+            AND DATE(ot.created_at) = ?
+            ORDER BY ot.created_at DESC
+        ");
+        $stmtTahsilat->execute([$selectedDate]);
+        $tahsilatlar = $stmtTahsilat->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Her tahsilata para_birimi ve onay_durumu ekle
+        foreach ($tahsilatlar as &$tahsilat) {
+            $tahsilat['para_birimi'] = $tahsilat['para_birimi'] ?? 'TRY';
+            $tahsilat['onay_durumu'] = $tahsilat['onay_durumu'] ?? 'bekliyor';
+        }
+    } catch(PDOException $e) {
+        error_log("Tahsilat sorgusu hatası: " . $e->getMessage());
+    }
 
     // Ödemeler (Tediye)
-    $stmtOdeme = $pdo->prepare("
-        SELECT ot.*, t.firma_adi as tedarikci_ad,
-               k.kullanici_adi as kaydeden, 'TRY' as para_birimi
-        FROM odeme_tahsilat ot
-        LEFT JOIN tedarikciler t ON ot.tedarikci_id = t.id
-        LEFT JOIN kullanicilar k ON ot.kullanici_id = k.id
-        WHERE ot.islem_turu = 'odeme'
-        AND DATE(ot.created_at) = ?
-        ORDER BY ot.created_at DESC
-    ");
-    $stmtOdeme->execute([$selectedDate]);
-    $odemeler = $stmtOdeme->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmtOdeme = $pdo->prepare("
+            SELECT ot.*, t.firma_adi as tedarikci_ad,
+                   k.kullanici_adi as kaydeden
+            FROM odeme_tahsilat ot
+            LEFT JOIN tedarikciler t ON ot.tedarikci_id = t.id
+            LEFT JOIN kullanicilar k ON ot.kullanici_id = k.id
+            WHERE ot.islem_turu = 'odeme'
+            AND DATE(ot.created_at) = ?
+            ORDER BY ot.created_at DESC
+        ");
+        $stmtOdeme->execute([$selectedDate]);
+        $odemeler = $stmtOdeme->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Her ödemeye para_birimi ve onay_durumu ekle
+        foreach ($odemeler as &$odeme) {
+            $odeme['para_birimi'] = $odeme['para_birimi'] ?? 'TRY';
+            $odeme['onay_durumu'] = $odeme['onay_durumu'] ?? 'bekliyor';
+        }
+    } catch(PDOException $e) {
+        error_log("Ödeme sorgusu hatası: " . $e->getMessage());
+    }
 
     // Para birimine göre toplamları hesapla
     foreach ($satislar as $satis) {
         $paraBirimi = $satis['para_birimi'] ?? 'TRY';
         if (isset($satisToplam[$paraBirimi])) {
-            $satisToplam[$paraBirimi] += $satis['genel_toplam'];
+            $satisToplam[$paraBirimi] += floatval($satis['genel_toplam'] ?? 0);
         }
     }
     
     foreach ($alislar as $alis) {
         $paraBirimi = $alis['para_birimi'] ?? 'TRY';
         if (isset($alisToplam[$paraBirimi])) {
-            $alisToplam[$paraBirimi] += $alis['genel_toplam'];
+            $alisToplam[$paraBirimi] += floatval($alis['genel_toplam'] ?? 0);
         }
     }
     
     foreach ($tahsilatlar as $tahsilat) {
         $paraBirimi = $tahsilat['para_birimi'] ?? 'TRY'; 
         if (isset($tahsilatToplam[$paraBirimi])) {
-            $tahsilatToplam[$paraBirimi] += $tahsilat['tutar'];
+            $tahsilatToplam[$paraBirimi] += floatval($tahsilat['tutar'] ?? 0);
         }
     }
     
     foreach ($odemeler as $odeme) {
         $paraBirimi = $odeme['para_birimi'] ?? 'TRY';
         if (isset($odemeToplam[$paraBirimi])) {
-            $odemeToplam[$paraBirimi] += $odeme['tutar'];
+            $odemeToplam[$paraBirimi] += floatval($odeme['tutar'] ?? 0);
         }
     }
 
 } catch(PDOException $e) {
-    echo "Hata: " . $e->getMessage();
-    exit;
+    error_log("Genel veritabanı hatası: " . $e->getMessage());
+    $satislar = [];
+    $alislar = [];
+    $tahsilatlar = [];
+    $odemeler = [];
 }
 
 // Para birimi sembollerini tanımla
@@ -215,7 +263,7 @@ $paraBirimiSembolleri = [
                 <h3 class="text-lg font-semibold">Satışlar</h3>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full">
+                <table class="min-w-full" id="satisTable">
                     <thead>
                         <tr class="bg-gray-50">
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
@@ -274,7 +322,7 @@ $paraBirimiSembolleri = [
                 <h3 class="text-lg font-semibold">Alışlar</h3>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full">
+                <table class="min-w-full" id="alisTable">
                     <thead>
                         <tr class="bg-gray-50">
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
@@ -333,7 +381,7 @@ $paraBirimiSembolleri = [
                 <h3 class="text-lg font-semibold">Tahsilatlar</h3>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full">
+                <table class="min-w-full" id="tahsilatTable">
                     <thead>
                         <tr class="bg-gray-50">
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
@@ -394,7 +442,7 @@ $paraBirimiSembolleri = [
                 <h3 class="text-lg font-semibold">Ödemeler</h3>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full">
+                <table class="min-w-full" id="odemeTable">
                     <thead>
                         <tr class="bg-gray-50">
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
@@ -513,16 +561,46 @@ document.addEventListener('DOMContentLoaded', function() {
     // DataTables'ı tüm tablolara uygula (kütüphane yüklenmişse)
     if (typeof $.fn.DataTable !== 'undefined') {
         try {
-            const tables = document.querySelectorAll('table');
-            tables.forEach(table => {
-                $(table).DataTable({
-                    language: {
-                        url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/tr.json'
-                    },
-                    pageLength: 5,
-                    lengthMenu: [5, 10, 25, 50],
-                    dom: '<"flex items-center justify-between mb-4"lf>rt<"flex items-center justify-between mt-4"ip>'
-                });
+            // Her tablo için ayrı ayrı DataTables başlat
+            const tableConfigs = {
+                '#satisTable': 6,
+                '#alisTable': 6,
+                '#tahsilatTable': 7,
+                '#odemeTable': 7
+            };
+            
+            Object.entries(tableConfigs).forEach(([selector, columnCount]) => {
+                const table = document.querySelector(selector);
+                if (table) {
+                    // Önce mevcut DataTables örneğini yok et (varsa)
+                    if ($.fn.DataTable.isDataTable(table)) {
+                        $(table).DataTable().destroy();
+                    }
+                    
+                    // Tablo satırlarını kontrol et
+                    const tbody = table.querySelector('tbody');
+                    const hasData = tbody && tbody.querySelectorAll('tr').length > 0;
+                    const emptyRow = tbody && tbody.querySelector('tr td[colspan]');
+                    
+                    // Eğer boş satır varsa (kayıt bulunamadı), DataTables'ı başlatma
+                    if (emptyRow) {
+                        console.log(selector + ' için veri yok, DataTables atlanıyor');
+                        return;
+                    }
+                    
+                    // Yeni DataTables başlat - columns ile
+                    $(table).DataTable({
+                        language: {
+                            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/tr.json'
+                        },
+                        pageLength: 5,
+                        lengthMenu: [5, 10, 25, 50],
+                        dom: '<"flex items-center justify-between mb-4"lf>rt<"flex items-center justify-between mt-4"ip>',
+                        destroy: true,
+                        // Sütun sayısını açıkça belirt
+                        columns: Array(columnCount).fill(null)
+                    });
+                }
             });
         } catch (error) {
             console.warn('DataTables yüklenirken bir hata oluştu:', error);
