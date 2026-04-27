@@ -1,9 +1,8 @@
 FROM php:8.2-apache
 
-RUN apt-get update \
-    && docker-php-ext-install pdo_mysql mbstring \
-    && a2enmod rewrite headers \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    docker-php-ext-install pdo_mysql mbstring; \
+    a2enmod rewrite headers
 
 WORKDIR /var/www/html
 
