@@ -27,7 +27,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-root_change_me}
     volumes:
       - db_data:/var/lib/mysql
-      - ./efsanebaharat.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./db-init:/docker-entrypoint-initdb.d:ro
 
 volumes:
   db_data:
