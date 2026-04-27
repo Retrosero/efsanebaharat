@@ -15,8 +15,6 @@ services:
       - uploads_data:/var/www/html/uploads
       - logs_data:/var/www/html/logs
       - temp_data:/var/www/html/temp
-    ports:
-      - "8080:80"
 
   db:
     image: mariadb:10.11
