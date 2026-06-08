@@ -1,5 +1,6 @@
 <?php
 // urunler.php
+$kritikStokOnly = isset($_GET['kritik']) && $_GET['kritik'] == '1';
 require_once 'includes/db.php';   // Veritabanı bağlantısı
 include 'includes/header.php';    // Header (sidebar + üst menü)
 
@@ -57,13 +58,30 @@ try {
 
 // Ürünleri veritabanından çek
 try {
-    $stmt = $pdo->query("
-        SELECT u.id, u.urun_adi, u.urun_kodu, u.barkod, u.stok_miktari, u.stok_kg, u.olcum_birimi, 
-               u.birim_fiyat, u.resim_url, u.raf_no, u.ambalaj, u.koli_adeti, m.marka_adi
-        FROM urunler u 
-        LEFT JOIN markalar m ON u.marka_id = m.id 
-        ORDER BY u.id DESC
-    ");
+    $checkMinStock = $pdo->query("SHOW COLUMNS FROM urunler LIKE 'minimum_stok'");
+    if ($checkMinStock->rowCount() === 0) {
+        $pdo->exec("ALTER TABLE urunler ADD COLUMN minimum_stok DECIMAL(10,3) NOT NULL DEFAULT 0 AFTER stok_miktari");
+    }
+
+    if ($kritikStokOnly) {
+        $stmt = $pdo->query("
+            SELECT u.id, u.urun_adi, u.urun_kodu, u.barkod, u.stok_miktari, u.stok_kg, u.olcum_birimi, 
+                   u.birim_fiyat, u.resim_url, u.raf_no, u.ambalaj, u.koli_adeti, u.minimum_stok, m.marka_adi
+            FROM urunler u 
+            LEFT JOIN markalar m ON u.marka_id = m.id 
+            WHERE COALESCE(u.minimum_stok, 0) > 0
+              AND u.stok_miktari <= u.minimum_stok
+            ORDER BY (u.minimum_stok - u.stok_miktari) DESC, u.id DESC
+        ");
+    } else {
+        $stmt = $pdo->query("
+            SELECT u.id, u.urun_adi, u.urun_kodu, u.barkod, u.stok_miktari, u.stok_kg, u.olcum_birimi, 
+                   u.birim_fiyat, u.resim_url, u.raf_no, u.ambalaj, u.koli_adeti, u.minimum_stok, m.marka_adi
+            FROM urunler u 
+            LEFT JOIN markalar m ON u.marka_id = m.id 
+            ORDER BY u.id DESC
+        ");
+    }
     $urunler = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e) {
     echo "Hata: " . $e->getMessage();
@@ -105,6 +123,11 @@ mark {
 <!-- Yeni Tasarım -->
 <div class="p-0">
   <div class="max-w-full mx-auto">
+    <?php if ($kritikStokOnly): ?>
+      <div class="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
+        Kritik stok görünümü: yalnızca kritik stok eşiğinin altına düşen ürünler listeleniyor.
+      </div>
+    <?php endif; ?>
     <div class="bg-white shadow-sm p-4 md:p-6">
       <!-- Arama ve Kontroller - Sabit (Fixed) -->
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6 sticky top-0 z-40 bg-white p-4 border-b shadow-sm mb-4">

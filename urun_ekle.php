@@ -2,6 +2,37 @@
 require_once 'includes/db.php';
 include 'includes/header.php';
 
+function parseDecimalTr($value): float {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 0.0;
+    }
+
+    $value = preg_replace('/[^\d,.\-]/', '', $value);
+    if ($value === '' || $value === null) {
+        return 0.0;
+    }
+
+    $lastComma = strrpos($value, ',');
+    $lastDot = strrpos($value, '.');
+    $decimalPos = max($lastComma !== false ? $lastComma : -1, $lastDot !== false ? $lastDot : -1);
+
+    if ($decimalPos >= 0) {
+        $intPart = substr($value, 0, $decimalPos);
+        $fracPart = substr($value, $decimalPos + 1);
+
+        if (strlen($fracPart) === 3) {
+            $normalized = str_replace([',', '.'], '', $intPart) . $fracPart;
+        } else {
+            $normalized = str_replace([',', '.'], '', $intPart) . '.' . preg_replace('/[^\d]/', '', $fracPart);
+        }
+    } else {
+        $normalized = str_replace([',', '.'], '', $value);
+    }
+
+    return is_numeric($normalized) ? (float)$normalized : 0.0;
+}
+
 // Create images directory if it doesn't exist
 $uploadDir = 'uploads/images/';
 if (!file_exists($uploadDir)) {
@@ -53,7 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $koli_adeti = intval($_POST['koli_adeti'] ?? 1);
     $marka = trim($_POST['marka'] ?? '');
     $kategori = trim($_POST['kategori'] ?? '');
-    $birim_fiyat = floatval($_POST['birim_fiyat'] ?? 0);
+    $birim_fiyat = parseDecimalTr($_POST['birim_fiyat'] ?? 0);
+    $minimum_stok = parseDecimalTr($_POST['minimum_stok'] ?? 0);
     $aciklama = trim($_POST['aciklama'] ?? '');
     $kategori_id = intval($_POST['kategori_id'] ?? 0);
     $alt_kategori_id = intval($_POST['alt_kategori_id'] ?? 0);
@@ -128,6 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $checkColumns = $pdo->query("SHOW COLUMNS FROM urunler LIKE 'olcum_birimi'");
                 $hasOlcumBirimi = $checkColumns->rowCount() > 0;
                 
+                $checkColumns = $pdo->query("SHOW COLUMNS FROM urunler LIKE 'minimum_stok'");
+                $hasMinimumStok = $checkColumns->rowCount() > 0;
+                
                 // Eğer sütunlar yoksa, bunları ekle
                 if (!$hasRafNo) {
                     $pdo->exec("ALTER TABLE urunler ADD COLUMN raf_no VARCHAR(50) DEFAULT NULL AFTER barkod");
@@ -149,7 +184,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     error_log("olcum_birimi sütunu eklendi");
                 }
                 
-                if (!$hasRafNo || !$hasKoliAdeti || !$hasAmbalaj || !$hasOlcumBirimi) {
+                if (!$hasMinimumStok) {
+                    $pdo->exec("ALTER TABLE urunler ADD COLUMN minimum_stok DECIMAL(10,3) NOT NULL DEFAULT 0 AFTER stok_miktari");
+                    error_log("minimum_stok sÃ¼tunu eklendi");
+                }
+                if (!$hasRafNo || !$hasKoliAdeti || !$hasAmbalaj || !$hasOlcumBirimi || !$hasMinimumStok) {
                     error_log("Tabloya yeni sütunlar eklendi, işlem devam ediyor");
                 }
                 
@@ -162,6 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasKoliAdeti) $sql .= ", koli_adeti";
                 if ($hasAmbalaj) $sql .= ", ambalaj";
                 if ($hasOlcumBirimi) $sql .= ", olcum_birimi";
+                if ($hasMinimumStok) $sql .= ", minimum_stok";
                 
                 $sql .= ", marka_id, 
                         kategori_id, alt_kategori_id,
@@ -176,6 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasKoliAdeti) $sql .= ", :koli_adeti";
                 if ($hasAmbalaj) $sql .= ", :ambalaj";
                 if ($hasOlcumBirimi) $sql .= ", :olcum_birimi";
+                if ($hasMinimumStok) $sql .= ", :minimum_stok";
                 
                 $sql .= ", :marka_id,
                         :kategori_id, :alt_kategori_id,
@@ -218,6 +259,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Ölçüm birimi parametresini ekle
                 if ($hasOlcumBirimi) {
                     $params[':olcum_birimi'] = $olcum_birimi;
+                }
+                if ($hasMinimumStok) {
+                    $params[':minimum_stok'] = $minimum_stok;
                 }
                 
                 // Resim URL'lerini parametrelere ekle
@@ -459,6 +503,23 @@ try {
                         >
 <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">₺</span>
 </div>
+</div>
+
+<div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Kritik Stok Eşiği</label>
+<div class="relative">
+                        <input 
+                            type="number" 
+                            name="minimum_stok"
+                            min="0"
+                            step="0.001"
+                            value="<?= htmlspecialchars($minimum_stok ?? 0) ?>"
+                            class="w-full h-11 pl-4 pr-20 border border-gray-200 rounded focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" 
+                            placeholder="0"
+                        >
+<span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs">adet / kg</span>
+</div>
+                    <p class="text-xs text-gray-500 mt-1">Stok bu değerin altına düştüğünde ürün kritik stok listesinde görünür.</p>
 </div>
 
 <div class="space-y-2">

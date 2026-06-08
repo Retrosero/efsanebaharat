@@ -54,6 +54,12 @@ if (!$fatura) {
 $successMessage = '';
 $errorMessage = '';
 
+function parseDecimalInput($value) {
+    if ($value === null) return 0.0;
+    $normalized = str_replace([' ', ','], ['', '.'], trim((string)$value));
+    return is_numeric($normalized) ? (float)$normalized : 0.0;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tarih = $_POST['tarih'] ?? date('Y-m-d');
     
@@ -89,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Yeni stok kontrolü
         foreach($urun_idler as $key => $urun_id) {
-            $miktar = floatval($miktarlar[$key]);
+            $miktar = parseDecimalInput($miktarlar[$key]);
             
             // Stok kontrolü
             $stmtStok = $pdo->prepare("SELECT stok_miktari FROM urunler WHERE id = ?");
@@ -101,15 +107,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Eski toplam tutarı al
-        $stmtOld = $pdo->prepare("SELECT toplam_tutar FROM faturalar WHERE id = :id");
+        // Eski toplam tutarı al (genel_toplam varsa onu baz al)
+        $stmtOld = $pdo->prepare("SELECT COALESCE(genel_toplam, toplam_tutar, 0) FROM faturalar WHERE id = :id");
         $stmtOld->execute([':id' => $fatura_id]);
         $oldToplam = $stmtOld->fetchColumn();
 
         // Yeni toplam tutarı hesapla
         $yeni_toplam = 0;
         foreach($miktarlar as $key => $miktar) {
-            $yeni_toplam += $miktar * $birim_fiyatlar[$key];
+            $miktarDegeri = parseDecimalInput($miktar);
+            $birimFiyatDegeri = parseDecimalInput($birim_fiyatlar[$key] ?? 0);
+            $yeni_toplam += $miktarDegeri * $birimFiyatDegeri;
         }
 
         // Faturayı güncelle
@@ -117,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             UPDATE faturalar 
             SET fatura_tarihi = :tarih,
                 toplam_tutar = :toplam_tutar,
+                genel_toplam = :genel_toplam,
                 updated_at = NOW()
             WHERE id = :id
         ");
@@ -124,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([
             ':tarih' => $tarih,
             ':toplam_tutar' => $yeni_toplam,
+            ':genel_toplam' => $yeni_toplam,
             ':id' => $fatura_id
         ]);
 
@@ -134,22 +144,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Yeni detayları ekle ve stokları güncelle
         $stmtIns = $pdo->prepare("
             INSERT INTO fatura_detaylari (
-                fatura_id, urun_id, miktar, birim_fiyat
+                fatura_id, urun_id, miktar, birim_fiyat,
+                toplam_fiyat, kdv_orani, kdv_tutari,
+                indirim_orani, indirim_tutari, net_tutar
             ) VALUES (
-                :fatura_id, :urun_id, :miktar, :birim_fiyat
+                :fatura_id, :urun_id, :miktar, :birim_fiyat,
+                :toplam_fiyat, :kdv_orani, :kdv_tutari,
+                :indirim_orani, :indirim_tutari, :net_tutar
             )
         ");
 
         foreach($urun_idler as $key => $urun_id) {
-            $miktar = floatval($miktarlar[$key]);
-            $birim_fiyat = floatval($birim_fiyatlar[$key]);
+            $miktar = parseDecimalInput($miktarlar[$key]);
+            $birim_fiyat = parseDecimalInput($birim_fiyatlar[$key]);
+            $toplam_fiyat = $miktar * $birim_fiyat;
+
+            // Düzenleme ekranında vergi/iskonto alanı olmadığı için mevcut iş akışını koruyarak 0 kabul edilir.
+            $kdv_orani = 0;
+            $kdv_tutari = 0;
+            $indirim_orani = 0;
+            $indirim_tutari = 0;
+            $net_tutar = $toplam_fiyat;
             
             // Fatura detayı ekle
             $stmtIns->execute([
                 ':fatura_id' => $fatura_id,
                 ':urun_id' => $urun_id,
                 ':miktar' => $miktar,
-                ':birim_fiyat' => $birim_fiyat
+                ':birim_fiyat' => $birim_fiyat,
+                ':toplam_fiyat' => $toplam_fiyat,
+                ':kdv_orani' => $kdv_orani,
+                ':kdv_tutari' => $kdv_tutari,
+                ':indirim_orani' => $indirim_orani,
+                ':indirim_tutari' => $indirim_tutari,
+                ':net_tutar' => $net_tutar
             ]);
 
             // Stok güncelle
@@ -342,30 +370,32 @@ $urunlerListesiJson = json_encode($urunlerJson);
                         <!-- Miktar -->
                         <div>
                             <input 
-                                type="number"
+                                type="text"
                                 name="miktar[]"
                                 value="<?= $detay['miktar'] ?>"
                                 class="w-full px-4 py-2 border rounded-lg"
-                                min="1"
-                                step="1"
+                                inputmode="decimal"
+                                pattern="[0-9]+([\\.,][0-9]+)?"
                                 required
                                 onchange="toplamHesapla(this)"
                                 onkeyup="toplamHesapla(this)"
+                                oninput="this.value=this.value.replace(/[^0-9.,]/g,'')"
                             >
                         </div>
                         
                         <!-- Birim Fiyat -->
                         <div>
                             <input 
-                                type="number"
+                                type="text"
                                 name="birim_fiyat[]"
                                 value="<?= $detay['birim_fiyat'] ?>"
                                 class="w-full px-4 py-2 border rounded-lg"
-                                min="0"
-                                step="0.01"
+                                inputmode="decimal"
+                                pattern="[0-9]+([\\.,][0-9]+)?"
                                 required
                                 onchange="toplamHesapla(this)"
                                 onkeyup="toplamHesapla(this)"
+                                oninput="this.value=this.value.replace(/[^0-9.,]/g,'')"
                             >
                         </div>
                         
@@ -392,6 +422,15 @@ $urunlerListesiJson = json_encode($urunlerJson);
                 <!-- Ürün Yok Mesajı -->
                 <div id="urunYokMesaji" class="<?= count($fatura_detaylari) > 0 ? 'hidden' : '' ?> p-4 text-center text-gray-500 border border-dashed rounded-lg">
                     Henüz ürün eklenmemiş. Yukarıdaki "Yeni Ürün Ekle" butonunu kullanarak ürün ekleyebilirsiniz.
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-4">
+                <div class="w-full md:w-80 bg-gray-50 border rounded-lg p-4">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-600">Genel Toplam</span>
+                        <span id="genelToplam" class="text-lg font-semibold text-primary">₺0,00</span>
+                    </div>
                 </div>
             </div>
 
@@ -540,30 +579,32 @@ function yeniUrunSatiriEkle() {
         <!-- Miktar -->
         <div>
             <input 
-                type="number"
+                type="text"
                 name="miktar[]"
                 value="1"
                 class="w-full px-4 py-2 border rounded-lg"
-                min="1"
-                step="1"
+                inputmode="decimal"
+                pattern="[0-9]+([\\.,][0-9]+)?"
                 required
                 onchange="toplamHesapla(this)"
                 onkeyup="toplamHesapla(this)"
+                oninput="this.value=this.value.replace(/[^0-9.,]/g,'')"
             >
         </div>
         
         <!-- Birim Fiyat -->
         <div>
             <input 
-                type="number"
+                type="text"
                 name="birim_fiyat[]"
                 value="0"
                 class="w-full px-4 py-2 border rounded-lg"
-                min="0"
-                step="0.01"
+                inputmode="decimal"
+                pattern="[0-9]+([\\.,][0-9]+)?"
                 required
                 onchange="toplamHesapla(this)"
                 onkeyup="toplamHesapla(this)"
+                oninput="this.value=this.value.replace(/[^0-9.,]/g,'')"
             >
         </div>
         
@@ -607,11 +648,18 @@ function silUrunSatiri(button) {
     }
 }
 
+function parseDecimalJs(value) {
+    if (value === null || value === undefined) return 0;
+    const normalized = String(value).replace(/\s/g, '').replace(',', '.');
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
 // Toplam hesaplama
 function toplamHesapla(input) {
     const satir = input.closest('.urun-satir');
-    const miktar = parseFloat(satir.querySelector('input[name="miktar[]"]').value) || 0;
-    const birimFiyat = parseFloat(satir.querySelector('input[name="birim_fiyat[]"]').value) || 0;
+    const miktar = parseDecimalJs(satir.querySelector('input[name="miktar[]"]').value);
+    const birimFiyat = parseDecimalJs(satir.querySelector('input[name="birim_fiyat[]"]').value);
     const toplam = miktar * birimFiyat;
     
     satir.querySelector('input[readonly]').value = 
@@ -626,12 +674,15 @@ function genelToplamHesapla() {
     let genelToplam = 0;
     
     satirlar.forEach(satir => {
-        const miktar = parseFloat(satir.querySelector('input[name="miktar[]"]').value) || 0;
-        const birimFiyat = parseFloat(satir.querySelector('input[name="birim_fiyat[]"]').value) || 0;
+        const miktar = parseDecimalJs(satir.querySelector('input[name="miktar[]"]').value);
+        const birimFiyat = parseDecimalJs(satir.querySelector('input[name="birim_fiyat[]"]').value);
         genelToplam += miktar * birimFiyat;
     });
+
+    const genelToplamEl = document.getElementById('genelToplam');
+    if (!genelToplamEl) return;
     
-    document.getElementById('genelToplam').textContent = 
+    genelToplamEl.textContent = 
         '₺' + genelToplam.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 </script>

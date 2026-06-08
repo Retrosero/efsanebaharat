@@ -3,6 +3,39 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 include 'includes/header.php';
 
+function parseDecimalTr($value): float {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 0.0;
+    }
+
+    // Keep only digits, separators and minus sign.
+    $value = preg_replace('/[^\d,.\-]/', '', $value);
+    if ($value === '' || $value === null) {
+        return 0.0;
+    }
+
+    $lastComma = strrpos($value, ',');
+    $lastDot = strrpos($value, '.');
+    $decimalPos = max($lastComma !== false ? $lastComma : -1, $lastDot !== false ? $lastDot : -1);
+
+    if ($decimalPos >= 0) {
+        $intPart = substr($value, 0, $decimalPos);
+        $fracPart = substr($value, $decimalPos + 1);
+
+        // If exactly 3 digits after separator, treat it as thousands separator.
+        if (strlen($fracPart) === 3) {
+            $normalized = str_replace([',', '.'], '', $intPart) . $fracPart;
+        } else {
+            $normalized = str_replace([',', '.'], '', $intPart) . '.' . preg_replace('/[^\d]/', '', $fracPart);
+        }
+    } else {
+        $normalized = str_replace([',', '.'], '', $value);
+    }
+
+    return is_numeric($normalized) ? (float)$normalized : 0.0;
+}
+
 // Ürün ID'sini al
 $urun_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -47,10 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $barkod = trim($_POST['barkod'] ?? '');
         $marka_id = intval($_POST['marka_id'] ?? 0);
         $kategori_id = intval($_POST['kategori_id'] ?? 0);
-        $birim_fiyat = floatval(str_replace(',', '.', $_POST['birim_fiyat']));
+        $birim_fiyat = parseDecimalTr($_POST['birim_fiyat'] ?? 0);
         $kdv_orani = intval($_POST['kdv_orani']);
-        $stok_miktari = floatval(str_replace(',', '.', $_POST['stok_miktari']));
-        $minimum_stok = floatval(str_replace(',', '.', $_POST['minimum_stok'] ?? 0));
+        $stok_miktari = parseDecimalTr($_POST['stok_miktari'] ?? 0);
+        $minimum_stok = parseDecimalTr($_POST['minimum_stok'] ?? 0);
         $raf_no = trim($_POST['raf_no'] ?? '');
         $birim = trim($_POST['birim'] ?? 'Adet');
         $ambalaj = trim($_POST['ambalaj'] ?? '');
@@ -284,7 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Minimum Stok</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Kritik Stok Eşiği</label>
                     <input 
                         type="text" 
                         name="minimum_stok" 

@@ -49,6 +49,12 @@ if (!function_exists('getMusteriCariBakiye')) {
                 SELECT COALESCE(SUM(tutar), 0) as toplam
                 FROM odeme_tahsilat
                 WHERE musteri_id = :mid
+                  AND islem_turu = 'tahsilat'
+                  AND (
+                      onayli = 1
+                      OR onay_durumu = 'onaylandi'
+                      OR (onayli IS NULL AND (onay_durumu IS NULL OR onay_durumu = ''))
+                  )
             ";
             
             $stmtTahsilat = $pdo->prepare($sql);
@@ -56,7 +62,21 @@ if (!function_exists('getMusteriCariBakiye')) {
             $toplamTahsilat = $stmtTahsilat->fetch(PDO::FETCH_ASSOC)['toplam'];
 
             // Güncel bakiye = Satışlar - Alışlar - Tahsilatlar
-            return $toplamSatis - $toplamAlis - $toplamTahsilat;
+            $sql = "
+                SELECT COALESCE(SUM(tutar), 0) as toplam
+                FROM odeme_tahsilat
+                WHERE musteri_id = :mid
+                  AND islem_turu = 'tediye'
+                  AND (
+                      onayli = 1
+                      OR onay_durumu = 'onaylandi'
+                      OR (onayli IS NULL AND (onay_durumu IS NULL OR onay_durumu = ''))
+                  )
+            ";
+            $stmtTediye = $pdo->prepare($sql);
+            $stmtTediye->execute([':mid' => $musteri_id]);
+            $toplamTediye = $stmtTediye->fetch(PDO::FETCH_ASSOC)['toplam'];
+            return $toplamSatis - $toplamAlis - $toplamTahsilat + $toplamTediye;
         } catch (PDOException $e) {
             error_log("Bakiye hesaplama hatası: " . $e->getMessage());
             return 0;
@@ -97,7 +117,11 @@ if (!function_exists('hesaplaGuncelBakiye')) {
             FROM odeme_tahsilat 
             WHERE musteri_id = :musteri_id
               AND islem_turu = 'tahsilat'
-              AND onayli = 1
+              AND (
+                  onayli = 1
+                  OR onay_durumu = 'onaylandi'
+                  OR (onayli IS NULL AND (onay_durumu IS NULL OR onay_durumu = ''))
+              )
         ");
         $stmtTahsilat->execute([':musteri_id' => $musteri_id]);
         $tahsilatlar = $stmtTahsilat->fetchColumn();
@@ -108,7 +132,11 @@ if (!function_exists('hesaplaGuncelBakiye')) {
             FROM odeme_tahsilat
             WHERE musteri_id = :musteri_id
               AND islem_turu = 'tediye'
-              AND onayli = 1
+              AND (
+                  onayli = 1
+                  OR onay_durumu = 'onaylandi'
+                  OR (onayli IS NULL AND (onay_durumu IS NULL OR onay_durumu = ''))
+              )
         ");
         $stmtTediye->execute([':musteri_id' => $musteri_id]);
         $tediyeler = $stmtTediye->fetchColumn();

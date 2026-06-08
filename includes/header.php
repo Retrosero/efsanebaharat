@@ -337,6 +337,10 @@ if (!in_array($current_page, $exempt_pages)) {
         <i class="ri-dashboard-line"></i>
         <span>Ana Sayfa</span>
       </a>
+      <a href="urunler.php?kritik=1" class="<?= basename($_SERVER['PHP_SELF']) == 'urunler.php' && isset($_GET['kritik']) && $_GET['kritik'] == '1' ? 'active' : '' ?>">
+        <i class="ri-alert-line"></i>
+        <span>Kritik Stok</span>
+      </a>
       <?php endif; ?>
       
       <?php if (sayfaErisimKontrol($pdo, 'satis.php')): ?>
@@ -399,6 +403,12 @@ if (!in_array($current_page, $exempt_pages)) {
             <i class="ri-dashboard-line"></i>
           </div>
           <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="urunler.php?kritik=1" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Kritik Stok">
+          <div class="w-5 h-5 flex items-center justify-center">
+            <i class="ri-alert-line"></i>
+          </div>
+          <span class="nav-text">Kritik Stok</span>
         </a>
         <?php endif; ?>
         

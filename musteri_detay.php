@@ -32,6 +32,10 @@ if (!$isModal) {
 
 // Müşteri ID kontrolü
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$hareketBaslangicRaw = isset($_GET['hareket_baslangic']) ? trim($_GET['hareket_baslangic']) : '';
+$hareketBitisRaw = isset($_GET['hareket_bitis']) ? trim($_GET['hareket_bitis']) : '';
+$hareketBaslangic = preg_match('/^\d{4}-\d{2}-\d{2}$/', $hareketBaslangicRaw) ? $hareketBaslangicRaw : '';
+$hareketBitis = preg_match('/^\d{4}-\d{2}-\d{2}$/', $hareketBitisRaw) ? $hareketBitisRaw : '';
 if (!$id) {
     die("Müşteri ID belirtilmemiş!");
 }
@@ -122,7 +126,11 @@ function getMusteriCariBakiye($pdo, $musteri_id){
         FROM odeme_tahsilat
         WHERE musteri_id=:mid
           AND islem_turu='tahsilat'
-          AND onayli=1
+          AND (
+              onayli = 1
+              OR onay_durumu = 'onaylandi'
+              OR (onayli IS NULL AND (onay_durumu IS NULL OR onay_durumu = ''))
+          )
     ");
     $stmtT->execute([':mid'=>$musteri_id]);
     $rowT = $stmtT->fetch(PDO::FETCH_ASSOC);
@@ -134,7 +142,11 @@ function getMusteriCariBakiye($pdo, $musteri_id){
         FROM odeme_tahsilat
         WHERE musteri_id=:mid
           AND islem_turu='tediye'
-          AND onayli=1
+          AND (
+              onayli = 1
+              OR onay_durumu = 'onaylandi'
+              OR (onayli IS NULL AND (onay_durumu IS NULL OR onay_durumu = ''))
+          )
     ");
     $stmtTed->execute([':mid'=>$musteri_id]);
     $rowTed = $stmtTed->fetch(PDO::FETCH_ASSOC);
@@ -280,7 +292,14 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
 $Siparisler = [];
 try {
     $stmtF = $pdo->prepare("
-        SELECT id, fatura_tarihi as tarih, toplam_tutar, odeme_durumu as fatura_durum
+        SELECT 
+            id,
+            fatura_tarihi as tarih,
+            toplam_tutar,
+            COALESCE(vergi_tutari, 0) AS vergi_tutari,
+            COALESCE(indirim_tutari, 0) AS indirim_tutari,
+            COALESCE(genel_toplam, toplam_tutar) AS genel_toplam,
+            odeme_durumu as fatura_durum
         FROM faturalar
         WHERE musteri_id=:mid
           AND fatura_turu='satis'
@@ -294,7 +313,31 @@ try {
 
 // HESAP HAREKETLERİ (Union => Satış + Tahsilat)
 $hesapHareketleri = [];
+$hareketFaturaDetaylariMap = [];
 try {
+    $paramsUnion = [':mid'=>$musteri['id'], ':mid2'=>$musteri['id'], ':mid3'=>$musteri['id']];
+    $faturaDateFilter1 = '';
+    $faturaDateFilter2 = '';
+    $odemeDateFilter = '';
+
+    if ($hareketBaslangic !== '') {
+      $faturaDateFilter1 .= " AND DATE(f.fatura_tarihi) >= :hareket_baslangic1";
+      $faturaDateFilter2 .= " AND DATE(f.fatura_tarihi) >= :hareket_baslangic2";
+      $odemeDateFilter .= " AND DATE(o.islem_tarihi) >= :hareket_baslangic3";
+      $paramsUnion[':hareket_baslangic1'] = $hareketBaslangic;
+      $paramsUnion[':hareket_baslangic2'] = $hareketBaslangic;
+      $paramsUnion[':hareket_baslangic3'] = $hareketBaslangic;
+    }
+
+    if ($hareketBitis !== '') {
+      $faturaDateFilter1 .= " AND DATE(f.fatura_tarihi) <= :hareket_bitis1";
+      $faturaDateFilter2 .= " AND DATE(f.fatura_tarihi) <= :hareket_bitis2";
+      $odemeDateFilter .= " AND DATE(o.islem_tarihi) <= :hareket_bitis3";
+      $paramsUnion[':hareket_bitis1'] = $hareketBitis;
+      $paramsUnion[':hareket_bitis2'] = $hareketBitis;
+      $paramsUnion[':hareket_bitis3'] = $hareketBitis;
+    }
+
     $sqlUnion = "
       SELECT 
         f.id AS rec_id,
@@ -308,6 +351,7 @@ try {
       FROM faturalar f
       WHERE f.fatura_turu='satis'
         AND f.musteri_id=:mid
+        {$faturaDateFilter1}
 
       UNION
 
@@ -323,6 +367,7 @@ try {
       FROM faturalar f
       WHERE f.fatura_turu='alis'
         AND f.musteri_id=:mid3
+        {$faturaDateFilter2}
 
       UNION
 
@@ -344,14 +389,65 @@ try {
         o.islem_turu AS tur
       FROM odeme_tahsilat o
       WHERE o.musteri_id=:mid2
+        AND (
+            o.onayli = 1
+            OR o.onay_durumu = 'onaylandi'
+            OR (o.onayli IS NULL AND (o.onay_durumu IS NULL OR o.onay_durumu = ''))
+        )
+        {$odemeDateFilter}
 
       ORDER BY islem_tarihi DESC, rec_id DESC
     ";
     $stmtU = $pdo->prepare($sqlUnion);
-    $stmtU->execute([':mid'=>$musteri['id'], ':mid2'=>$musteri['id'], ':mid3'=>$musteri['id']]);
+    $stmtU->execute($paramsUnion);
     $hesapHareketleri = $stmtU->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e){
     error_log("Hesap hareketleri çekilirken hata: " . $e->getMessage());
+}
+
+try {
+    $faturaIds = [];
+    foreach ($hesapHareketleri as $hareket) {
+        if (($hareket['tur'] === 'Satis' || $hareket['tur'] === 'Alis') && !empty($hareket['rec_id'])) {
+            $faturaIds[] = (int)$hareket['rec_id'];
+        }
+    }
+    $faturaIds = array_values(array_unique($faturaIds));
+
+    if (!empty($faturaIds)) {
+        $placeholders = implode(',', array_fill(0, count($faturaIds), '?'));
+        $stmtDetay = $pdo->prepare("
+            SELECT 
+                fd.fatura_id,
+                COALESCE(NULLIF(fd.urun_adi, ''), CONCAT('Urun #', fd.urun_id)) AS urun_adi,
+                fd.miktar,
+                COALESCE(NULLIF(fd.olcum_birimi, ''), u.olcum_birimi, 'adet') AS olcum_birimi,
+                fd.birim_fiyat,
+                COALESCE(fd.toplam_fiyat, fd.miktar * fd.birim_fiyat) AS satir_toplam
+            FROM fatura_detaylari fd
+            LEFT JOIN urunler u ON u.id = fd.urun_id
+            WHERE fd.fatura_id IN ($placeholders)
+            ORDER BY fd.fatura_id ASC, fd.id ASC
+        ");
+        $stmtDetay->execute($faturaIds);
+        $detayRows = $stmtDetay->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($detayRows as $detay) {
+            $fid = (int)$detay['fatura_id'];
+            if (!isset($hareketFaturaDetaylariMap[$fid])) {
+                $hareketFaturaDetaylariMap[$fid] = [];
+            }
+            $hareketFaturaDetaylariMap[$fid][] = [
+                'urun_adi' => $detay['urun_adi'],
+                'miktar' => (float)$detay['miktar'],
+                'olcum_birimi' => $detay['olcum_birimi'] ?: 'adet',
+                'birim_fiyat' => (float)$detay['birim_fiyat'],
+                'satir_toplam' => (float)$detay['satir_toplam']
+            ];
+        }
+    }
+} catch(Exception $e){
+    error_log("Hesap hareketleri fatura detaylari cekilirken hata: " . $e->getMessage());
 }
 
 // SATIN ALINAN ÜRÜNLER => fatura_detaylari + urunler + faturalar (fatura_turu='satis')
@@ -361,11 +457,13 @@ try {
       SELECT 
          f.fatura_tarihi AS satis_tarihi,
          d.miktar,
+         COALESCE(NULLIF(d.olcum_birimi, ''), u.olcum_birimi, 'adet') AS olcum_birimi,
          d.birim_fiyat,
-         d.urun_adi,
+         COALESCE(NULLIF(d.urun_adi, ''), NULLIF(u.urun_adi, ''), CONCAT('Urun #', d.urun_id)) AS urun_adi,
          d.urun_id
       FROM fatura_detaylari d
       JOIN faturalar f ON d.fatura_id=f.id
+      LEFT JOIN urunler u ON d.urun_id = u.id
       WHERE f.musteri_id=:mid
         AND f.fatura_turu='satis'
       ORDER BY f.fatura_tarihi DESC, f.id DESC
@@ -550,15 +648,26 @@ try {
             <tr>
               <th class="px-2 sm:px-4 py-2 text-left">Tarih</th>
               <th class="px-2 sm:px-4 py-2 text-left">Fatura No</th>
-              <th class="px-2 sm:px-4 py-2 text-left">Tutar</th>
+              <th class="px-2 sm:px-4 py-2 text-left">Alt Toplam</th>
+              <th class="px-2 sm:px-4 py-2 text-left">KDV</th>
+              <th class="px-2 sm:px-4 py-2 text-left">Genel Toplam</th>
               <th class="px-2 sm:px-4 py-2 text-left">Durum</th>
             </tr>
           </thead>
           <tbody>
             <?php if(empty($Siparisler)): ?>
-              <tr><td colspan="4" class="p-4 text-gray-500">Henüz satış faturası yok.</td></tr>
+              <tr><td colspan="6" class="p-4 text-gray-500">Henüz satış faturası yok.</td></tr>
             <?php else: ?>
               <?php foreach($Siparisler as $sip): ?>
+            <?php
+              $kdvTutar = (float)$sip['vergi_tutari'];
+              if ($kdvTutar <= 0) {
+                $kdvTutar = (float)$sip['genel_toplam'] - ((float)$sip['toplam_tutar'] - (float)$sip['indirim_tutari']);
+              }
+              if (abs($kdvTutar) < 0.005) {
+                $kdvTutar = 0;
+              }
+            ?>
             <tr class="border-b">
                   <td class="px-2 sm:px-4 py-2"><?= date('d.m.Y', strtotime($sip['tarih'])) ?></td>
               <td class="px-2 sm:px-4 py-2">
@@ -567,6 +676,8 @@ try {
                     </a>
               </td>
                   <td class="px-2 sm:px-4 py-2">₺<?= number_format($sip['toplam_tutar'],2,',','.') ?></td>
+                  <td class="px-2 sm:px-4 py-2 <?= $kdvTutar > 0 ? 'text-blue-700 font-medium' : 'text-gray-500' ?>">₺<?= number_format($kdvTutar,2,',','.') ?></td>
+                  <td class="px-2 sm:px-4 py-2 font-medium">₺<?= number_format($sip['genel_toplam'],2,',','.') ?></td>
                   <td class="px-2 sm:px-4 py-2">
                     <span class="px-2 py-1 rounded-full text-xs <?= $sip['fatura_durum'] == 'odendi' ? 'bg-green-100 text-green-800' : ($sip['fatura_durum'] == 'kismen_odendi' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') ?>">
                       <?= $sip['fatura_durum'] == 'odendi' ? 'Ödendi' : ($sip['fatura_durum'] == 'kismen_odendi' ? 'Kısmen Ödendi' : 'Ödenmedi') ?>
@@ -584,7 +695,45 @@ try {
     <div id="hareketler" class="tab-content hidden">
       <div class="flex justify-between mb-4">
         <!-- Sol taraf: Filtreler vs. için boş bırakıldı -->
-        <div></div>
+        <form method="GET" id="hareketFilterForm" class="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="id" value="<?= (int)$id ?>">
+          <?php if ($isModal): ?>
+          <input type="hidden" name="modal" value="1">
+          <?php endif; ?>
+          <div class="flex flex-col">
+            <label for="hareket_baslangic" class="text-xs text-gray-500 mb-1">Ba&#351;lang&#305;&#231;</label>
+            <input
+              type="date"
+              id="hareket_baslangic"
+              name="hareket_baslangic"
+              value="<?= htmlspecialchars($hareketBaslangic) ?>"
+              class="px-2 py-2 border rounded-lg text-sm"
+            />
+          </div>
+          <div class="flex flex-col">
+            <label for="hareket_bitis" class="text-xs text-gray-500 mb-1">Biti&#351;</label>
+            <input
+              type="date"
+              id="hareket_bitis"
+              name="hareket_bitis"
+              value="<?= htmlspecialchars($hareketBitis) ?>"
+              class="px-2 py-2 border rounded-lg text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            class="bg-primary text-white px-3 py-2 !rounded-button hover:bg-opacity-90 text-sm"
+          >
+            Filtrele
+          </button>
+          <button
+            type="button"
+            id="clearHareketFilterBtn"
+            class="bg-gray-200 text-gray-700 px-3 py-2 !rounded-button hover:bg-gray-300 text-sm"
+          >
+            Temizle
+          </button>
+        </form>
         
         <!-- Sağ taraf: Export butonu -->
         <div class="relative">
@@ -601,6 +750,12 @@ try {
               onclick="exportTable('hareketlerTable', 'pdf')"
             >
               <i class="ri-file-pdf-line mr-2"></i>PDF
+            </button>
+            <button
+              class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+              onclick="exportDetailedHareketlerPdf()"
+            >
+              <i class="ri-file-list-3-line mr-2"></i>Detaylı PDF
             </button>
             <button
               class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
@@ -672,7 +827,7 @@ try {
                   $runningBalance += $hareket['tutar'];
               }
             ?>
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='<?= $detayUrl ?>'">
+            <tr class="hover:bg-gray-50 cursor-pointer" data-rec-id="<?= (int)$hareket['rec_id'] ?>" data-tur="<?= htmlspecialchars($hareket['tur']) ?>" onclick="window.location.href='<?= $detayUrl ?>'">
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= $islemTarihi ?></td>
               <td class="px-2 sm:px-4 py-2 text-sm font-medium"><?= $islemTuru ?></td>
               <td class="px-2 sm:px-4 py-2 text-sm text-gray-500"><?= htmlspecialchars($hareket['odeme_yontemi']) ?></td>
@@ -760,7 +915,14 @@ try {
               <?php foreach($SatınAlınanUrunler as $u): ?>
                 <tr class="border-b">
                   <td class="px-2 sm:px-4 py-2"><?= htmlspecialchars($u['urun_adi']) ?></td>
-                  <td class="px-2 sm:px-4 py-2"><?= intval($u['miktar']) ?></td>
+                  <?php
+                    $urunBirim = $u['olcum_birimi'] ?? 'adet';
+                    $urunMiktar = (float)$u['miktar'];
+                    $urunMiktarFormatli = ($urunBirim === 'adet')
+                      ? number_format($urunMiktar, 0, ',', '.')
+                      : number_format($urunMiktar, 3, ',', '.');
+                  ?>
+                  <td class="px-2 sm:px-4 py-2"><?= $urunMiktarFormatli . ' ' . htmlspecialchars($urunBirim) ?></td>
                   <td class="px-2 sm:px-4 py-2">₺<?= number_format($u['birim_fiyat'],2,',','.') ?></td>
                   <td class="px-2 sm:px-4 py-2"><?= date('d.m.Y', strtotime($u['satis_tarihi'])) ?></td>
                 </tr>
@@ -1112,6 +1274,71 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
   });
 
+  // Hesap hareketleri filtreleme (arkaplanda yenileme)
+  const hareketForm = document.getElementById('hareketFilterForm');
+  const clearHareketFilterBtn = document.getElementById('clearHareketFilterBtn');
+  const hesapHareketleriTabBtn = document.querySelector('.tab-btn[data-tab="hareketler"]');
+  const activateTab = (tabId) => {
+    tabBtns.forEach(b => b.classList.remove('tab-active'));
+    tabContents.forEach(tc => tc.classList.add('hidden'));
+    const targetBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    const targetContent = document.getElementById(tabId);
+    if (targetBtn) targetBtn.classList.add('tab-active');
+    if (targetContent) targetContent.classList.remove('hidden');
+  };
+
+  async function refreshHareketlerWithParams(params) {
+    const baseUrl = window.location.pathname;
+    const requestUrl = `${baseUrl}?${params.toString()}`;
+    const response = await fetch(requestUrl, { credentials: 'same-origin' });
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const newTbody = doc.querySelector('#hareketlerTable tbody');
+    const currentTbody = document.querySelector('#hareketlerTable tbody');
+    if (newTbody && currentTbody) {
+      currentTbody.innerHTML = newTbody.innerHTML;
+      activateTab('hareketler');
+      history.replaceState(null, '', `${requestUrl}#hareketler`);
+      if (hesapHareketleriTabBtn) {
+        hesapHareketleriTabBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }
+
+  if (hareketForm) {
+    hareketForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = hareketForm.querySelector('button[type="submit"]');
+      const originalText = submitBtn ? submitBtn.textContent : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Yukleniyor...';
+      }
+      try {
+        const params = new URLSearchParams(new FormData(hareketForm));
+        await refreshHareketlerWithParams(params);
+      } catch (err) {
+        console.error('Hesap hareketleri filtreleme hatasi:', err);
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      }
+    });
+  }
+
+  if (clearHareketFilterBtn && hareketForm) {
+    clearHareketFilterBtn.addEventListener('click', async () => {
+      const baslangicInput = document.getElementById('hareket_baslangic');
+      const bitisInput = document.getElementById('hareket_bitis');
+      if (baslangicInput) baslangicInput.value = '';
+      if (bitisInput) bitisInput.value = '';
+      const params = new URLSearchParams(new FormData(hareketForm));
+      await refreshHareketlerWithParams(params);
+    });
+  }
+
   // Telefon format
   const phone=document.getElementById('phone');
   if(phone){
@@ -1182,6 +1409,148 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
+const hareketFaturaDetayMap = <?= json_encode($hareketFaturaDetaylariMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const hareketPdfMusteriAdi = <?= json_encode($adSoyad, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+function exportDetailedHareketlerPdf() {
+  const table = document.getElementById('hareketlerTable');
+  if (!table) return;
+
+  const fileName = `EfsaneBaharat_hareketler_detayli_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '_')}`;
+  const originalCursor = document.body.style.cursor;
+  document.body.style.cursor = 'wait';
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = '-99999px';
+  wrapper.style.top = '0';
+  wrapper.style.width = '1200px';
+  wrapper.style.background = '#fff';
+  wrapper.style.padding = '24px';
+  wrapper.style.fontFamily = 'Arial, sans-serif';
+  wrapper.innerHTML = `
+    <h1 style="font-size:24px;margin:0 0 8px 0;">Hesap Hareketleri (Detaylı)</h1>
+    <div style="font-size:14px;margin-bottom:4px;">Müşteri: ${hareketPdfMusteriAdi || ''}</div>
+    <div style="font-size:14px;margin-bottom:16px;">Tarih: ${new Date().toLocaleDateString('tr-TR')}</div>
+  `;
+
+  const rows = table.querySelectorAll('tbody tr');
+  rows.forEach((row) => {
+    if (row.style.display === 'none') return;
+    const cells = row.querySelectorAll('td');
+    if (cells.length !== 7) return;
+
+    const recId = row.dataset.recId;
+    const tur = row.dataset.tur;
+    const faturaDetaylari = (tur === 'Satis' || tur === 'Alis') && recId ? (hareketFaturaDetayMap[recId] || []) : [];
+
+    const card = document.createElement('div');
+    card.style.border = '1px solid #ddd';
+    card.style.borderRadius = '6px';
+    card.style.padding = '10px';
+    card.style.marginBottom = '10px';
+    card.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="text-align:left;padding:6px;border:1px solid #e5e7eb;">Tarih</th>
+            <th style="text-align:left;padding:6px;border:1px solid #e5e7eb;">İşlem</th>
+            <th style="text-align:left;padding:6px;border:1px solid #e5e7eb;">Evrak</th>
+            <th style="text-align:left;padding:6px;border:1px solid #e5e7eb;">Para Birimi</th>
+            <th style="text-align:left;padding:6px;border:1px solid #e5e7eb;">Açıklama</th>
+            <th style="text-align:right;padding:6px;border:1px solid #e5e7eb;">Tutar</th>
+            <th style="text-align:right;padding:6px;border:1px solid #e5e7eb;">Bakiye</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:6px;border:1px solid #e5e7eb;">${cells[0].textContent.trim()}</td>
+            <td style="padding:6px;border:1px solid #e5e7eb;">${cells[1].textContent.trim()}</td>
+            <td style="padding:6px;border:1px solid #e5e7eb;">${cells[2].textContent.trim()}</td>
+            <td style="padding:6px;border:1px solid #e5e7eb;">${cells[3].textContent.trim()}</td>
+            <td style="padding:6px;border:1px solid #e5e7eb;">${cells[4].textContent.trim()}</td>
+            <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">${cells[5].textContent.trim()}</td>
+            <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">${cells[6].textContent.trim()}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    if (faturaDetaylari.length > 0) {
+      const detayTitle = document.createElement('div');
+      detayTitle.textContent = `Fatura Kalemleri (#${recId})`;
+      detayTitle.style.margin = '10px 0 6px';
+      detayTitle.style.fontSize = '13px';
+      detayTitle.style.fontWeight = '700';
+      card.appendChild(detayTitle);
+
+      const detayTable = document.createElement('table');
+      detayTable.style.width = '100%';
+      detayTable.style.borderCollapse = 'collapse';
+      detayTable.style.fontSize = '12px';
+
+      detayTable.innerHTML = `
+        <thead>
+          <tr style="background:#eff6ff;">
+            <th style="text-align:left;padding:6px;border:1px solid #dbeafe;">Ürün</th>
+            <th style="text-align:right;padding:6px;border:1px solid #dbeafe;">Miktar</th>
+            <th style="text-align:right;padding:6px;border:1px solid #dbeafe;">Birim Fiyat</th>
+            <th style="text-align:right;padding:6px;border:1px solid #dbeafe;">Satır Toplam</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${faturaDetaylari.map((d) => `
+            <tr>
+              <td style="padding:6px;border:1px solid #e5e7eb;">${d.urun_adi ?? ''}</td>
+              <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">${Number(d.miktar || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 3 })} ${d.olcum_birimi || 'adet'}</td>
+              <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">${Number(d.birim_fiyat || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">${Number(d.satir_toplam || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+      card.appendChild(detayTable);
+    }
+
+    wrapper.appendChild(card);
+  });
+
+  document.body.appendChild(wrapper);
+  const { jsPDF } = window.jspdf;
+  html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+    .then((canvas) => {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const usableWidth = pageWidth - (margin * 2);
+      const imgHeight = (canvas.height * usableWidth) / canvas.width;
+      const imgData = canvas.toDataURL('image/png');
+
+      let heightLeft = imgHeight;
+      let position = margin;
+      pdf.addImage(imgData, 'PNG', margin, position, usableWidth, imgHeight);
+      heightLeft -= (pageHeight - (margin * 2));
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', margin, position, usableWidth, imgHeight);
+        heightLeft -= (pageHeight - (margin * 2));
+      }
+
+      pdf.save(`${fileName}.pdf`);
+    })
+    .catch((err) => {
+      console.error('Detaylı PDF oluşturma hatası:', err);
+      alert('Detaylı PDF oluşturulurken bir hata oluştu');
+    })
+    .finally(() => {
+      wrapper.remove();
+      document.body.style.cursor = originalCursor;
+    });
+}
+
 // Export tablo
 // Export tablo
 function exportTable(tableId, format) {
@@ -1196,6 +1565,45 @@ function exportTable(tableId, format) {
   } 
   else if (format === 'pdf') {
     const { jsPDF } = window.jspdf;
+    if (tableId === 'hareketlerTable') {
+      const originalCursor = document.body.style.cursor;
+      document.body.style.cursor = 'wait';
+
+      html2canvas(table, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      }).then((canvas) => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const usableWidth = pageWidth - (margin * 2);
+        const imgHeight = (canvas.height * usableWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = margin;
+
+        pdf.addImage(imgData, 'PNG', margin, position, usableWidth, imgHeight);
+        heightLeft -= (pageHeight - (margin * 2));
+
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight + margin;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', margin, position, usableWidth, imgHeight);
+          heightLeft -= (pageHeight - (margin * 2));
+        }
+
+        pdf.save(`${fileName}.pdf`);
+        document.body.style.cursor = originalCursor;
+      }).catch((err) => {
+        console.error('PDF oluşturma hatası:', err);
+        alert('PDF oluşturulurken bir hata oluştu');
+        document.body.style.cursor = originalCursor;
+      });
+      return;
+    }
     
     // Kullanıcıya işlem başladığını hissettir
     const originalCursor = document.body.style.cursor;
@@ -1341,6 +1749,47 @@ function showFaturaDetay(faturaId) {
     })
     .then(html => {
       content.innerHTML = html;
+
+      // Fatura Bilgileri alanına KDV satırı ekle (varsa)
+      const bilgiKutusu = content.querySelector('.grid.grid-cols-2.gap-2');
+      if (bilgiKutusu) {
+        const satirlar = Array.from(bilgiKutusu.querySelectorAll('p'));
+        const degerOku = (etiket) => {
+          const idx = satirlar.findIndex(p => p.textContent.trim() === etiket);
+          if (idx >= 0 && satirlar[idx + 1]) {
+            const sayi = satirlar[idx + 1].textContent
+              .replace(/[^\d,.-]/g, '')
+              .replace('.', '')
+              .replace(',', '.');
+            const parsed = parseFloat(sayi);
+            return Number.isFinite(parsed) ? parsed : 0;
+          }
+          return 0;
+        };
+
+        const altToplam = degerOku('Alt Toplam:');
+        const iskonto = degerOku('İskonto:');
+        const genelToplam = degerOku('Genel Toplam:');
+        let kdv = genelToplam - (altToplam - iskonto);
+        if (Math.abs(kdv) < 0.005) kdv = 0;
+
+        const kdvVarMi = satirlar.some(p => p.textContent.trim() === 'KDV:');
+        if (kdv > 0 && !kdvVarMi) {
+          const label = document.createElement('p');
+          label.className = 'text-gray-600 text-sm';
+          label.textContent = 'KDV:';
+
+          const val = document.createElement('p');
+          val.className = 'text-blue-700 text-sm text-right';
+          val.textContent = `+${kdv.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
+
+          const genelLabel = satirlar.find(p => p.textContent.trim() === 'Genel Toplam:');
+          if (genelLabel) {
+            bilgiKutusu.insertBefore(label, genelLabel);
+            bilgiKutusu.insertBefore(val, genelLabel);
+          }
+        }
+      }
       
       // Modal içindeki sil butonuna event listener ekle
       const deleteBtn = content.querySelector('button[onclick^="deleteDetail"]');

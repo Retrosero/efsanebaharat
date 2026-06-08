@@ -132,6 +132,27 @@ foreach ($detaylar as $row) {
 }
 
 // Ürün bilgilerini hazırla
+$hesaplananGenelToplam = 0;
+foreach ($detaylar as $row) {
+    $hesaplananGenelToplam += floatval($row['net_tutar'] ?? 0);
+}
+$gosterilecekGenelToplam = $hesaplananGenelToplam > 0
+    ? $hesaplananGenelToplam
+    : floatval($fatura['genel_toplam'] ?? ($fatura['toplam_tutar'] ?? 0));
+
+$gosterilecekAltToplam = floatval($fatura['toplam_tutar'] ?? 0);
+$gosterilecekIskonto = floatval($fatura['indirim_tutari'] ?? 0);
+if (abs($gosterilecekIskonto) < 0.005) {
+    $gosterilecekIskonto = 0;
+}
+$gosterilecekKdv = floatval($fatura['vergi_tutari'] ?? 0);
+if ($gosterilecekKdv <= 0) {
+    $gosterilecekKdv = $gosterilecekGenelToplam - ($gosterilecekAltToplam - $gosterilecekIskonto);
+}
+if (abs($gosterilecekKdv) < 0.005) {
+    $gosterilecekKdv = 0;
+}
+
 $items = [];
 foreach ($detaylar as $row) {
     $items[] = [
