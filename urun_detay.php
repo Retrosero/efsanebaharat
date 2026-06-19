@@ -30,7 +30,25 @@ if (!$urun) {
     include 'includes/footer.php';
     exit;
 }
-
+$hesaplanan_stok = null;
+try {
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(
+            CASE
+                WHEN f.fatura_turu = 'alis' THEN fd.miktar
+                WHEN f.fatura_turu = 'satis' THEN -fd.miktar
+                ELSE 0
+            END
+        ), 0) AS stok_miktari
+        FROM fatura_detaylari fd
+        JOIN faturalar f ON fd.fatura_id = f.id
+        WHERE fd.urun_id = :urun_id
+    ");
+    $stmt->execute([':urun_id' => $urun_id]);
+    $hesaplanan_stok = $stmt->fetchColumn();
+} catch(Exception $e) {
+    error_log('Urun detay stok hesaplama hatasi: ' . $e->getMessage());
+}
 // Ürün resimlerini bir diziye topla
 $resimler = [];
 for ($i = 1; $i <= 10; $i++) {
@@ -165,7 +183,7 @@ try {
                             <div class="text-gray-600">Stok Miktarı</div>
                             <div class="font-medium">
                                 <?php 
-                                $stok_miktari = $urun['stok_miktari'];
+                                $stok_miktari = $hesaplanan_stok !== null ? $hesaplanan_stok : $urun['stok_miktari'];
                                 $olcum_birimi = $urun['olcum_birimi'];
                                 
                                 if ($olcum_birimi === 'kg') {
@@ -271,4 +289,4 @@ function changeMainImage(src, element) {
 }
 </script>
 
-<?php include 'includes/footer.php'; ?> 
+<?php include 'includes/footer.php'; ?>
