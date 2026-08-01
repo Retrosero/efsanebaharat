@@ -117,7 +117,7 @@ try {
                     // Fatura detaylarını sil
                     $stmt = $pdo->prepare("DELETE FROM fatura_detaylari WHERE fatura_id = ?");
                     $stmt->execute([$id]);
-                    
+
                     // Onay işlemi tablosunda kayıt var mı kontrol et, varsa sil
                     $stmtCheckOnay = $pdo->prepare("SELECT COUNT(*) FROM onay_islemleri WHERE islem_tipi = ? AND islem_id = ?");
                     $stmtCheckOnay->execute(['satis', $id]);

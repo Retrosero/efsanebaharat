@@ -82,9 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Eski stokları iade et
         foreach($eskiDetaylar as $eski) {
+            $stokOperatoru = ($fatura['fatura_turu'] === 'alis') ? '-' : '+';
             $stmtStokIade = $pdo->prepare("
                 UPDATE urunler 
-                SET stok_miktari = stok_miktari + :qty
+                SET stok_miktari = stok_miktari $stokOperatoru :qty
                 WHERE id = :uid
             ");
             $stmtStokIade->execute([
@@ -95,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Yeni stok kontrolü
         foreach($urun_idler as $key => $urun_id) {
+            if (empty($urun_id)) continue;
             $miktar = parseDecimalInput($miktarlar[$key]);
             
             // Stok kontrolü
@@ -155,6 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
 
         foreach($urun_idler as $key => $urun_id) {
+            if (empty($urun_id)) continue;
             $miktar = parseDecimalInput($miktarlar[$key]);
             $birim_fiyat = parseDecimalInput($birim_fiyatlar[$key]);
             $toplam_fiyat = $miktar * $birim_fiyat;
@@ -181,9 +184,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             // Stok güncelle
+            $stokOperatoru = ($fatura['fatura_turu'] === 'alis') ? '+' : '-';
             $stmtStokGuncelle = $pdo->prepare("
                 UPDATE urunler 
-                SET stok_miktari = stok_miktari - :qty,
+                SET stok_miktari = stok_miktari $stokOperatoru :qty,
                     updated_at = NOW()
                 WHERE id = :uid
             ");
