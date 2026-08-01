@@ -80,7 +80,7 @@ try {
         case 'fatura_sil':
             if ($id > 0) {
                 // Önce faturanın bilgilerini al (tür, tutar, müşteri/tedarikçi ID)
-                $stmt = $pdo->prepare("SELECT fatura_turu, toplam_tutar, musteri_id, tedarikci_id, onay_durumu FROM faturalar WHERE id = ?");
+                $stmt = $pdo->prepare("SELECT fatura_turu, genel_toplam, musteri_id, tedarikci_id, onay_durumu FROM faturalar WHERE id = ?");
                 $stmt->execute([$id]);
                 $fatura = $stmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -138,15 +138,15 @@ try {
                         if ($fatura['fatura_turu'] == 'satis' && $fatura['musteri_id']) {
                             // Satış faturası silindiğinde müşteri bakiyesinden düş
                             $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye - ? WHERE id = ?");
-                            $stmt->execute([$fatura['toplam_tutar'], $fatura['musteri_id']]);
+                            $stmt->execute([$fatura['genel_toplam'], $fatura['musteri_id']]);
                         } elseif ($fatura['fatura_turu'] == 'alis' && $fatura['tedarikci_id']) {
                             // Alış faturası silindiğinde tedarikçi bakiyesine ekle
                             $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye + ? WHERE id = ?");
-                            $stmt->execute([$fatura['toplam_tutar'], $fatura['tedarikci_id']]);
+                            $stmt->execute([$fatura['genel_toplam'], $fatura['tedarikci_id']]);
                         } elseif ($fatura['fatura_turu'] == 'alis' && $fatura['musteri_id']) {
                             // Alış faturası (müşteriden alış) silindiğinde müşteri bakiyesine ekle
                             $stmt = $pdo->prepare("UPDATE musteriler SET cari_bakiye = cari_bakiye + ? WHERE id = ?");
-                            $stmt->execute([$fatura['toplam_tutar'], $fatura['musteri_id']]);
+                            $stmt->execute([$fatura['genel_toplam'], $fatura['musteri_id']]);
                     }
                     
                     $pdo->commit();

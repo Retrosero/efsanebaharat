@@ -95,7 +95,9 @@ $eurBakiye = $musteri['eur_bakiye'] ?? 0;
 $gbpBakiye = $musteri['gbp_bakiye'] ?? 0;
 
 // Dinamik Cari Bakiye Hesaplama
-function getMusteriCariBakiye($pdo, $musteri_id){
+// Eski hesaplama, guncelbakiye.php'deki ortak fonksiyonun yerine
+// kullanılmamalıdır; ara toplam alanını kullandığı için korunur fakat çağrılmaz.
+function getMusteriCariBakiyeLegacy($pdo, $musteri_id){
     // Toplam satış (Müşteriyi borçlandırır: +)
     $stmtS = $pdo->prepare("
         SELECT COALESCE(SUM(toplam_tutar),0) AS toplamSatis
@@ -341,7 +343,7 @@ try {
     $sqlUnion = "
       SELECT 
         f.id AS rec_id,
-        f.toplam_tutar AS tutar,
+        f.genel_toplam AS tutar,
         f.para_birimi,
         'Satış' AS odeme_yontemi,
         f.aciklama,
@@ -351,13 +353,14 @@ try {
       FROM faturalar f
       WHERE f.fatura_turu='satis'
         AND f.musteri_id=:mid
+        AND f.iptal = 0
         {$faturaDateFilter1}
 
       UNION
 
       SELECT 
         f.id AS rec_id,
-        f.toplam_tutar AS tutar,
+        f.genel_toplam AS tutar,
         f.para_birimi,
         'Alış' AS odeme_yontemi,
         f.aciklama,
@@ -367,6 +370,7 @@ try {
       FROM faturalar f
       WHERE f.fatura_turu='alis'
         AND f.musteri_id=:mid3
+        AND f.iptal = 0
         {$faturaDateFilter2}
 
       UNION

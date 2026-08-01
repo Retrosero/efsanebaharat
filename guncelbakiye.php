@@ -6,9 +6,9 @@ if (!function_exists('getMusteriCariBakiye')) {
         try {
             // Toplam satışları hesapla
             $sql = "
-                SELECT COALESCE(SUM(toplam_tutar), 0) as toplam
+                SELECT COALESCE(SUM(genel_toplam), 0) as toplam
                 FROM faturalar
-                WHERE musteri_id = :mid AND fatura_turu = 'satis'
+                WHERE musteri_id = :mid AND fatura_turu = 'satis' AND iptal = 0
             ";
             
             // Para birimi filtresi ekle
@@ -26,9 +26,9 @@ if (!function_exists('getMusteriCariBakiye')) {
 
             // Toplam alışları hesapla
             $sql = "
-                SELECT COALESCE(SUM(toplam_tutar), 0) as toplam
+                SELECT COALESCE(SUM(genel_toplam), 0) as toplam
                 FROM faturalar
-                WHERE musteri_id = :mid AND fatura_turu = 'alis'
+                WHERE musteri_id = :mid AND fatura_turu = 'alis' AND iptal = 0
             ";
             
             // Para birimi filtresi ekle
@@ -89,7 +89,7 @@ if (!function_exists('hesaplaGuncelBakiye')) {
     function hesaplaGuncelBakiye($pdo, $musteri_id) {
         // SATIŞLAR
         $stmtSatis = $pdo->prepare("
-            SELECT COALESCE(SUM(toplam_tutar), 0) AS toplam
+            SELECT COALESCE(SUM(genel_toplam), 0) AS toplam
             FROM faturalar
             WHERE musteri_id = :musteri_id 
               AND fatura_turu = 'satis'
@@ -101,7 +101,7 @@ if (!function_exists('hesaplaGuncelBakiye')) {
 
         // ALIŞLAR
         $stmtAlis = $pdo->prepare("
-            SELECT COALESCE(SUM(toplam_tutar), 0) AS toplam
+            SELECT COALESCE(SUM(genel_toplam), 0) AS toplam
             FROM faturalar
             WHERE musteri_id = :musteri_id 
               AND fatura_turu = 'alis'
@@ -176,11 +176,12 @@ function guncelleDovizbakiyeleri($pdo, $musteri_id) {
     // USD Bakiye
     $stmtUSD = $pdo->prepare("
         SELECT 
-            COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN toplam_tutar ELSE 0 END), 0) -
-            COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN toplam_tutar ELSE 0 END), 0) AS usd_bakiye
+            COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN genel_toplam ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN genel_toplam ELSE 0 END), 0) AS usd_bakiye
         FROM faturalar 
         WHERE musteri_id = :musteri_id 
           AND para_birimi = 'USD'
+          AND iptal = 0
     ");
     $stmtUSD->execute([':musteri_id' => $musteri_id]);
     $usdBakiye = $stmtUSD->fetchColumn();
@@ -188,11 +189,12 @@ function guncelleDovizbakiyeleri($pdo, $musteri_id) {
     // EUR Bakiye
     $stmtEUR = $pdo->prepare("
         SELECT 
-            COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN toplam_tutar ELSE 0 END), 0) -
-            COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN toplam_tutar ELSE 0 END), 0) AS eur_bakiye
+            COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN genel_toplam ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN genel_toplam ELSE 0 END), 0) AS eur_bakiye
         FROM faturalar 
         WHERE musteri_id = :musteri_id 
           AND para_birimi = 'EUR'
+          AND iptal = 0
     ");
     $stmtEUR->execute([':musteri_id' => $musteri_id]);
     $eurBakiye = $stmtEUR->fetchColumn();
@@ -200,11 +202,12 @@ function guncelleDovizbakiyeleri($pdo, $musteri_id) {
     // GBP Bakiye
     $stmtGBP = $pdo->prepare("
         SELECT 
-            COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN toplam_tutar ELSE 0 END), 0) -
-            COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN toplam_tutar ELSE 0 END), 0) AS gbp_bakiye
+            COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN genel_toplam ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN fatura_turu = 'alis' THEN genel_toplam ELSE 0 END), 0) AS gbp_bakiye
         FROM faturalar 
         WHERE musteri_id = :musteri_id 
           AND para_birimi = 'GBP'
+          AND iptal = 0
     ");
     $stmtGBP->execute([':musteri_id' => $musteri_id]);
     $gbpBakiye = $stmtGBP->fetchColumn();

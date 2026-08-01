@@ -72,6 +72,65 @@ if (!$fatura) {
         }
         exit;
     }
+
+    // Satış faturası kesilmeden hemen önceki cari bakiyeyi hesapla.
+    // Hesap, kaydın oluşturulma zamanı yerine muhasebe tarihini esas alır.
+    $faturaOncesiBakiye = null;
+    if ($fatura['fatura_turu'] === 'satis' && $fatura['musteri_id']) {
+        // Cari hareketlerde muhasebe tarihi esastır. Kayıt oluşturma zamanı,
+        // geriye tarihli bir tahsilat/fatura girildiğinde yanlış bakiye verir.
+        $faturaSirasiKosulu = "(
+            fatura_tarihi < :fatura_tarihi_once
+            OR (
+                fatura_tarihi = :fatura_tarihi_same
+                AND (created_at < :fatura_created_at_before OR (created_at = :fatura_created_at_equal AND id < :fatura_id))
+            )
+        )";
+
+        $stmtOncekiFaturalar = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE WHEN fatura_turu = 'satis' THEN genel_toplam ELSE -genel_toplam END), 0)
+            FROM faturalar
+            WHERE musteri_id = :musteri_id
+              AND para_birimi = 'TRY'
+              AND iptal = 0
+              AND $faturaSirasiKosulu
+        ");
+        $stmtOncekiFaturalar->execute([
+            ':musteri_id' => $fatura['musteri_id'],
+            ':fatura_tarihi_once' => $fatura['fatura_tarihi'],
+            ':fatura_tarihi_same' => $fatura['fatura_tarihi'],
+            ':fatura_created_at_before' => $fatura['created_at'],
+            ':fatura_created_at_equal' => $fatura['created_at'],
+            ':fatura_id' => $fatura_id,
+        ]);
+        $oncekiFaturaBakiyesi = (float) $stmtOncekiFaturalar->fetchColumn();
+
+        $stmtOncekiOdemeler = $pdo->prepare("
+            SELECT COALESCE(SUM(CASE
+                WHEN islem_turu = 'tahsilat' THEN -tutar
+                WHEN islem_turu = 'tediye' THEN tutar
+                ELSE 0
+            END), 0)
+            FROM odeme_tahsilat
+            WHERE musteri_id = :musteri_id
+              AND (
+                  islem_tarihi < :odeme_tarihi_once
+                  OR (islem_tarihi = :odeme_tarihi_same AND created_at < :fatura_created_at)
+              )
+              AND (
+                  onayli = 1
+                  OR onay_durumu = 'onaylandi'
+                  OR (onayli IS NULL AND (onay_durumu IS NULL OR onay_durumu = ''))
+              )
+        ");
+        $stmtOncekiOdemeler->execute([
+            ':musteri_id' => $fatura['musteri_id'],
+            ':odeme_tarihi_once' => $fatura['fatura_tarihi'],
+            ':odeme_tarihi_same' => $fatura['fatura_tarihi'],
+            ':fatura_created_at' => $fatura['created_at'],
+        ]);
+        $faturaOncesiBakiye = $oncekiFaturaBakiyesi + (float) $stmtOncekiOdemeler->fetchColumn();
+    }
     
     // Müşteri için döviz bakiyelerini al (satış faturası ise)
     if ($fatura['fatura_turu'] == 'satis' && $fatura['musteri_id']) {
@@ -401,7 +460,7 @@ else if ($print_mode) {
     
     .header {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       border-bottom: 1px solid #ddd;
       padding-bottom: 10px;
       margin-bottom: 15px;
@@ -585,16 +644,35 @@ else if ($print_mode) {
       border-top: 1px solid #ddd;
       padding-top: 10px;
     }
+
+    .previous-balance {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px dashed #ddd;
+      text-align: right;
+      font-size: 10px;
+      color: #555;
+    }
+
+    .previous-balance-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-bottom: 3px;
+    }
+
+    .current-balance-row {
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px solid #ddd;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <div class="invoice-container">
     <!-- Header -->
     <div class="header">
-      <div>
-        <div class="company-name">Efsane Baharat</div>
-        <div class="company-slogan">Baharatlar & Kuruyemişler</div>
-      </div>
       <div>
         <div class="document-title"><?= $faturaTuruBaslik ?></div>
         <div class="document-number">Fiş No: #<?= htmlspecialchars($faturaNo) ?></div>
@@ -617,49 +695,6 @@ else if ($print_mode) {
         <div class="customer-details"><?= htmlspecialchars($fatura['email']) ?></div>
         <?php endif; ?>
         
-        <!-- Müşteri bakiyesi - Her durumda göster -->
-        <div class="customer-balance">
-          <div class="balance-title">Müşteri Bakiyesi:</div>
-          <?php if (isset($fatura['try_bakiye'])): ?>
-          <div class="balance-row">
-            <span>TRY:</span>
-            <span class="<?= $fatura['try_bakiye'] > 0 ? 'balance-negative' : ($fatura['try_bakiye'] < 0 ? 'balance-positive' : '') ?>">
-              <?= number_format(abs($fatura['try_bakiye']), 2, ',', '.') ?> ₺
-              <?= $fatura['try_bakiye'] > 0 ? '(Borçlu)' : ($fatura['try_bakiye'] < 0 ? '(Alacaklı)' : '') ?>
-            </span>
-          </div>
-          <?php endif; ?>
-          
-          <?php if (isset($fatura['usd_bakiye']) && $fatura['usd_bakiye'] != 0): ?>
-          <div class="balance-row">
-            <span>USD:</span>
-            <span class="<?= $fatura['usd_bakiye'] > 0 ? 'balance-negative' : 'balance-positive' ?>">
-              <?= number_format(abs($fatura['usd_bakiye']), 2, ',', '.') ?> $
-              <?= $fatura['usd_bakiye'] > 0 ? '(Borçlu)' : '(Alacaklı)' ?>
-            </span>
-          </div>
-          <?php endif; ?>
-          
-          <?php if (isset($fatura['eur_bakiye']) && $fatura['eur_bakiye'] != 0): ?>
-          <div class="balance-row">
-            <span>EUR:</span>
-            <span class="<?= $fatura['eur_bakiye'] > 0 ? 'balance-negative' : 'balance-positive' ?>">
-              <?= number_format(abs($fatura['eur_bakiye']), 2, ',', '.') ?> €
-              <?= $fatura['eur_bakiye'] > 0 ? '(Borçlu)' : '(Alacaklı)' ?>
-            </span>
-          </div>
-          <?php endif; ?>
-          
-          <?php if (isset($fatura['gbp_bakiye']) && $fatura['gbp_bakiye'] != 0): ?>
-          <div class="balance-row">
-            <span>GBP:</span>
-            <span class="<?= $fatura['gbp_bakiye'] > 0 ? 'balance-negative' : 'balance-positive' ?>">
-              <?= number_format(abs($fatura['gbp_bakiye']), 2, ',', '.') ?> £
-              <?= $fatura['gbp_bakiye'] > 0 ? '(Borçlu)' : '(Alacaklı)' ?>
-            </span>
-          </div>
-          <?php endif; ?>
-        </div>
       </div>
       
       <div>
@@ -753,6 +788,30 @@ else if ($print_mode) {
         </div>
       </div>
     </div>
+
+    <?php if ($faturaOncesiBakiye !== null): ?>
+    <div class="previous-balance">
+      <?php
+        $mevcutFisTutari = (float) ($fatura['genel_toplam'] ?? $fatura['toplam_tutar']);
+        $guncelBakiye = $faturaOncesiBakiye + $mevcutFisTutari;
+      ?>
+      <div class="previous-balance-row">
+        <span>Önceki Bakiye:</span>
+        <span><?= number_format(abs($faturaOncesiBakiye), 2, ',', '.') ?> ₺</span>
+      </div>
+      <div class="previous-balance-row">
+        <span>Mevcut Fiş:</span>
+        <span>+<?= number_format($mevcutFisTutari, 2, ',', '.') ?> ₺</span>
+      </div>
+      <div class="previous-balance-row current-balance-row">
+        <span>Güncel Bakiye:</span>
+        <span class="<?= $guncelBakiye > 0 ? 'balance-negative' : ($guncelBakiye < 0 ? 'balance-positive' : '') ?>">
+          <?= number_format(abs($guncelBakiye), 2, ',', '.') ?> ₺
+          <?= $guncelBakiye > 0 ? '(Borçlu)' : ($guncelBakiye < 0 ? '(Alacaklı)' : '') ?>
+        </span>
+      </div>
+    </div>
+    <?php endif; ?>
     
   </div>
 </body>
@@ -1220,8 +1279,19 @@ else if ($print_mode) {
 
   // Yazdırma butonu için olay dinleyici
   document.getElementById('printButton').addEventListener('click', function() {
-    // Sadece fatura içeriğini yazdırma
-    printInvoiceOnly();
+    // Satış ekranındaki yazdırma akışıyla aynı şablonu kullan.
+    // Hesap hareketlerinden açılan faturalar da bu sayfaya geldiği için
+    // yeniden yazdırmada tek bir çıktı formatı korunur.
+    const printFrame = document.createElement('iframe');
+    printFrame.style.display = 'none';
+    printFrame.src = 'fatura_detay.php?id=<?= $fatura_id ?>&print=1';
+    document.body.appendChild(printFrame);
+
+    printFrame.onload = function() {
+      printFrame.contentWindow.focus();
+      printFrame.contentWindow.print();
+      window.setTimeout(() => printFrame.remove(), 1000);
+    };
   });
 
   // Sadece fatura içeriğini yazdırma fonksiyonu

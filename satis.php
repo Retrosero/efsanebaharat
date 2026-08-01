@@ -260,42 +260,48 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
 <!-- Cart Sidebar -->
 <div
   id="cartSidebar"
-  class="cart-sidebar fixed top-0 right-0 w-full sm:w-96 h-full bg-white shadow-xl z-55 hidden"
+  class="cart-sidebar fixed top-0 right-0 w-full sm:w-[430px] h-full bg-slate-50 shadow-2xl z-55 hidden"
 >
   <div class="flex flex-col h-full">
-    <div class="p-4 border-b">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-medium">Sepetim</h3>
+    <div class="p-5 bg-white border-b border-slate-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-wider text-primary uppercase">Satış İşlemi</p>
+          <h3 class="mt-1 text-xl font-bold text-slate-900">Sepetim</h3>
+        </div>
         <div class="flex items-center gap-2">
-          <button id="closeCart" class="p-2 hover:bg-gray-100 rounded-full">
+          <button id="closeCart" class="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-full" aria-label="Sepeti kapat">
             <i class="ri-close-line ri-lg"></i>
           </button>
         </div>
       </div>
     </div>
     <div class="flex-1 overflow-y-auto p-4">
-      <div id="cartItems" class="space-y-4">
+      <div id="cartItems" class="space-y-3">
         <!-- Cart items JS ile -->
       </div>
     </div>
     
       
       <!-- Net Tutar alanı ve Sepet işlem butonları daha düzenli şekilde yerleştirildi -->
-      <div class="space-y-4 border-t pt-4 mt-3">
+      <div class="space-y-3 border-t border-slate-200 bg-white p-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
         <!-- Net Tutar Toggle Butonu (dropdown'a tıklanabilir) -->
-        <div id="netTutarToggle" class="flex items-center justify-between cursor-pointer bg-gray-50 p-3 rounded-lg">
-          <span class="font-semibold text-gray-800">Genel Toplam:</span>
+        <div id="netTutarToggle" class="flex items-center justify-between cursor-pointer bg-primary/5 border border-primary/10 p-3.5 rounded-xl">
+          <span class="font-semibold text-slate-800">Genel Toplam:</span>
           <div class="flex items-center">
-            <span id="totalSummary" class="font-bold text-primary text-lg">0,00 ₺</span>
-            <i class="ri-arrow-down-s-line ml-2 transform transition-transform duration-200" id="netTutarArrow"></i>
+            <span id="totalSummary" class="font-bold text-primary text-xl">0,00 ₺</span>
+            <i class="ri-arrow-down-s-line ml-2 transform transition-transform duration-200 rotate-180" id="netTutarArrow"></i>
           </div>
         </div>
         
         <!-- Detaylı bilgiler - başlangıçta gizli -->
-        <div id="cartDetailSection" class="space-y-3 mt-3 hidden border-t pt-3 bg-white p-3 rounded-lg shadow-sm">
+        <div id="cartDetailSection" class="space-y-4 bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
           <!-- Müşteri Seçimi Alanı -->
           <div id="cartCustomerSection">
-            <div class="text-sm font-medium mb-2">Cari Seçimi</div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-sm font-semibold text-slate-800">Cari Seçimi</div>
+              <span class="text-xs text-slate-500">Fatura için zorunlu</span>
+            </div>
             <div id="customerSelectionArea">
               <!-- Müşteri seçilmemiş - arama alanı gözükecek -->
               <div id="noCustomerSelected" class="w-full">
@@ -304,7 +310,7 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
                     type="text"
                     id="customerSearchDropdown"
                     placeholder="Müşteri ara..."
-                    class="w-full px-3 py-2 border rounded-lg text-sm"
+                    class="w-full px-3 py-2.5 border border-slate-200 bg-white rounded-xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     autocomplete="off"
                   >
                   <i class="ri-search-line absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
@@ -319,7 +325,7 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
               </div>
               
               <!-- Müşteri seçilmiş - bilgileri gözükecek -->
-              <div id="customerSelectedInfo" class="w-full hidden">
+              <div id="customerSelectedInfo" class="w-full hidden rounded-xl border border-primary/15 bg-primary/5 p-3">
                 <div class="flex items-center justify-between mb-1">
                   <div class="text-sm font-medium" id="selectedCustomerNameDetail">Müşteri Seçilmedi</div>
                   <div class="flex items-center gap-2">
@@ -327,8 +333,8 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
                   </div>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-xs text-gray-500">Bakiye:</span>
-                  <span id="customerBalance" class="text-xs font-medium">0,00 ₺</span>
+                  <span class="text-xs text-slate-500">Güncel bakiye:</span>
+                  <span id="customerBalance" class="text-xs font-semibold">0,00 ₺</span>
                 </div>
               </div>
             </div>
@@ -981,7 +987,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!dropdown) return;
         
         const searchDropdown = document.getElementById('customerSearchDropdown');
-        if (!dropdown.contains(e.target) && e.target !== searchDropdown) {
+        if (!dropdown?.contains(e.target) && e.target !== searchDropdown) {
             dropdown.classList.add('hidden');
         }
     });
@@ -1048,7 +1054,7 @@ function initEvents(){
     const cartSidebar=document.getElementById('cartSidebar');
     const cartBtn=document.getElementById('cartBtn');
     if (cartSidebar && !cartSidebar.classList.contains('hidden') && cartBtn) { // Check if sidebar and button exist and sidebar is visible
-      if(e.target && cartSidebar && cartBtn && !cartSidebar.contains(e.target) && !cartBtn.contains(e.target)){
+      if(e.target && cartSidebar && cartBtn && !cartSidebar?.contains(e.target) && !cartBtn?.contains(e.target)){
         cartSidebar.classList.remove('show');
         cartSidebar.classList.add('hidden'); // Ensure it's hidden
       }
@@ -2585,6 +2591,16 @@ function fetchCustomerBalance(customerId) {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
+        // Sayfa ilk yüklendiğindeki kayıtlı bakiye yerine, hesap hareketlerinden
+        // hesaplanan güncel değeri hem arama listesinde hem seçili müşteride kullan.
+        const customer = customersFromDB.find(item => String(item.id) === String(customerId));
+        if (customer) {
+          customer.cari_bakiye = Number(data.try_bakiye) || 0;
+          customer.usd_bakiye = Number(data.usd_bakiye) || 0;
+          customer.eur_bakiye = Number(data.eur_bakiye) || 0;
+          customer.gbp_bakiye = Number(data.gbp_bakiye) || 0;
+        }
+
         const balanceDisplay = document.getElementById(`customerBalance_${customerId}`);
         if (balanceDisplay) {
           let bakiyeHtml = `<div>TRY: ${parseFloat(data.try_bakiye).toLocaleString('tr-TR')} ₺</div>`;
@@ -2601,6 +2617,10 @@ function fetchCustomerBalance(customerId) {
           }
           
           balanceDisplay.innerHTML = bakiyeHtml;
+        }
+
+        if (selectedCustomer && String(selectedCustomer.id) === String(customerId)) {
+          updateCustomerBalance();
         }
       }
     })
@@ -2733,7 +2753,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const dropdown = document.getElementById('customerDropdown');
       if (!dropdown) return;
       
-      if (!dropdown.contains(e.target) && e.target !== customerSearchDropdown) {
+      if (!dropdown?.contains(e.target) && e.target !== customerSearchDropdown) {
         dropdown.classList.add('hidden');
       }
     });
