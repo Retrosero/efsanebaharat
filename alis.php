@@ -380,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <option value="">Ürün Seçin</option>
                     <?php foreach($urunler as $urun): ?>
                       <option value="<?= $urun['id'] ?>" data-fiyat="<?= $urun['birim_fiyat'] ?>" data-ad="<?= htmlspecialchars($urun['urun_adi']) ?>" data-kod="<?= htmlspecialchars($urun['urun_kodu']) ?>">
-                        <?= htmlspecialchars($urun['urun_adi']) ?> (<?= $urun['urun_kodu'] ?>)
+                        <?= htmlspecialchars($urun['urun_adi']) ?> (<?= htmlspecialchars($urun['urun_kodu']) ?>)
                       </option>
                     <?php endforeach; ?>
                   </select>
@@ -990,7 +990,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Döviz kurları
-const dovizKurlari = <?= !empty($dovizKurlari) ? json_encode($dovizKurlari) : '{"USD":{"alis":30.5000,"satis":30.7000},"EUR":{"alis":32.4000,"satis":32.6000},"GBP":{"alis":38.1000,"satis":38.3000}}' ?>;
+const dovizKurlari = <?= !empty($dovizKurlari) ? json_encode($dovizKurlari, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : '{"USD":{"alis":30.5000,"satis":30.7000},"EUR":{"alis":32.4000,"satis":32.6000},"GBP":{"alis":38.1000,"satis":38.3000}}' ?>;
 
 // Para birimi değiştiğinde
 function parabirimiDegisti(birim) {

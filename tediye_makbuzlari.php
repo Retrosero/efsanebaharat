@@ -47,7 +47,7 @@ try {
     $sql = "
         SELECT ot.*, 
                CONCAT(m.ad, ' ', m.soyad) AS musteri_adi,
-               u.adsoyad AS kullanici_adi
+               u.kullanici_adi AS kullanici_adi
         FROM odeme_tahsilat ot
         LEFT JOIN musteriler m ON ot.musteri_id = m.id
         LEFT JOIN kullanicilar u ON ot.kullanici_id = u.id

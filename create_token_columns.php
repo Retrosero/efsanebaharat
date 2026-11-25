@@ -2,6 +2,7 @@
 // kullanicilar tablosuna gerekli token sütunlarını eklemek için script
 
 require_once 'includes/db.php';
+yoneticiGerekli(); // Bakım/kurulum betiği: sadece yönetici
 
 try {
     // Sütunların var olup olmadığını kontrol etmek için bilgi şemasını sorgulayalım

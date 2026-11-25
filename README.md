@@ -66,3 +66,13 @@ UPDATE `stok_hareketleri` SET `olcum_birimi` = 'adet';
 3. Kg ile alınan ürünleri gram olarak satmak için, satış ekranında birim seçimini "gr" olarak değiştirin
 
 Bu güncelleme sayesinde, özellikle baharat gibi ürünleri kg ile alıp gram ile satabilirsiniz. 
+## Testler
+
+```bash
+# JS (birim dönüşümleri + satış ekranı kg/gr davranışı)
+npm test
+
+# PHP birim + entegrasyon testleri (MariaDB + uygulama Docker'da ayağa kalkar)
+docker compose -p efsanetest -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+docker compose -p efsanetest -f docker-compose.test.yml down -v
+```

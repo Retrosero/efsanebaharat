@@ -50,11 +50,11 @@ try {
     ");
     $urunler = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e) {
-    echo "Veritabanı hatası: " . $e->getMessage();
+    error_log("satis.php ürün sorgusu: " . $e->getMessage());
 }
 
 // Ürünleri JSON formatına çevir
-$urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
+$urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 ?>
 <div class="p-2">
   <h1 class="text-lg sm:text-xl font-semibold mb-3"></h1>
@@ -62,7 +62,7 @@ $urunlerJson = json_encode($urunler, JSON_NUMERIC_CHECK);
   <!-- JavaScript'e varsayılan birim değerini aktaralım -->
   <script>
     // PHP'den gelen varsayılan ağırlık birimi
-    const varsayilanAgirlikBirimi = "<?php echo $varsayilan_agirlik_birimi; ?>";
+    const varsayilanAgirlikBirimi = <?php echo json_encode($varsayilan_agirlik_birimi === 'kg' ? 'kg' : 'gr'); ?>;
   </script>
 
   <!-- Yeni Üst Menü Tasarımı - Sabit (Fixed) -->
@@ -808,9 +808,10 @@ body { font-family: 'Inter', sans-serif; }
 }
 </style>
 
+<script src="assets/js/birim.js"></script>
 <script>
 // musteriler
-const customersFromDB = <?php echo json_encode($customerRows); ?>;
+const customersFromDB = <?php echo json_encode($customerRows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
 // Ürünleri veritabanından çek
 let products = <?php echo $urunlerJson; ?>;
@@ -1125,7 +1126,7 @@ function renderCustomerList(lst=customersFromDB){
       onclick="selectCustomer(${m.id})"
       class="block w-full text-left p-3 hover:bg-gray-50 rounded-lg border-b border-gray-100"
     >
-      <div class="font-medium">${m.ad} ${m.soyad||''}</div>
+      <div class="font-medium">${escHtml(m.ad)} ${escHtml(m.soyad||'')}</div>
       <div class="text-sm text-gray-500" id="customerBalance_${m.id}">Bakiye yükleniyor...</div>
     </button>
   `).join('');
@@ -1222,7 +1223,7 @@ function renderProducts() {
           ${p.resim_url ? 
             `<img 
               src="${p.resim_url}" 
-            alt="${p.urun_adi}"
+            alt="${escHtml(p.urun_adi)}"
             class="w-full h-full object-contain"
               onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100%\\' height=\\'100%\\' viewBox=\\'0 0 100 100\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23f3f4f6\\'/><path d=\\'M30,40 L70,40 L70,60 L30,60 Z\\' fill=\\'%23d1d5db\\'/><path d=\\'M42,30 L58,30 L58,35 L42,35 Z\\' fill=\\'%23d1d5db\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-family=\\'sans-serif\\' font-size=\\'10\\' fill=\\'%236b7280\\'>Resim Yok</text></svg>';"
             >` : 
@@ -1264,8 +1265,8 @@ function renderProducts() {
       </div>
       <div class="p-3">
         <div class="flex justify-between items-start mb-1">
-          <h3 class="text-sm sm:text-base font-medium text-gray-800 line-clamp-2 leading-tight">${p.urun_adi}</h3>
-          <span class="text-xs text-gray-500 whitespace-nowrap ml-2">Kod: ${p.urun_kodu || 'PRD' + p.id}</span>
+          <h3 class="text-sm sm:text-base font-medium text-gray-800 line-clamp-2 leading-tight">${escHtml(p.urun_adi)}</h3>
+          <span class="text-xs text-gray-500 whitespace-nowrap ml-2">Kod: ${escHtml(p.urun_kodu || 'PRD' + p.id)}</span>
         </div>
         <div class="flex justify-between items-center mb-2">
           <span class="text-primary font-bold">${formatCurrency(p.satis_fiyati)}</span>
@@ -1310,10 +1311,13 @@ function renderProducts() {
               step="1"
               max="${p.olcum_birimi === 'kg' ? parseFloat(p.stok_miktari) * 1000 : parseFloat(p.stok_miktari)}"
               onchange="validateAndAddToCartWeight(${p.id})"
+              oninput="this.dataset.dirty = '1'"
               onfocus="this.select()"
               ${p.stok_miktari <= 0 ? 'disabled' : ''}
             >
             <button 
+              type="button"
+              onmousedown="event.preventDefault()"
               id="weightToggle_${p.id}"
               class="px-2 sm:px-3 py-1 sm:py-2 border-y border-r rounded-r text-sm sm:text-base bg-gray-50 hover:bg-gray-100 cursor-pointer"
               onclick="toggleWeightUnit(${p.id})"
@@ -1439,7 +1443,7 @@ function showQtyModal(productId) {
         <div id="qtyModal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
             <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium">${product.urun_adi}</h3>
+                    <h3 class="text-lg font-medium">${escHtml(product.urun_adi)}</h3>
                     <button onclick="closeQtyModal()" class="p-2 hover:bg-gray-100 rounded-full">
                         <i class="ri-close-line ri-lg"></i>
                     </button>
@@ -1722,7 +1726,7 @@ function renderCart(){
   cItems.innerHTML= cart.map((item, index) =>`
     <div class="flex gap-3 p-3 bg-gray-50 rounded-lg">
       <div class="flex-1">
-        <h4 class="font-medium text-xs">${item.name} (${item.olcumBirimi})</h4>
+        <h4 class="font-medium text-xs">${escHtml(item.name)} (${item.olcumBirimi})</h4>
         <div class="flex items-center gap-2 mt-1">
           <span class="text-xs text-gray-500">Birim Fiyat:</span>
           <div class="flex items-center">
@@ -1740,7 +1744,7 @@ function renderCart(){
         <p class="text-xs text-gray-500">Kod: PRD${String(item.id).padStart(4, '0')}</p>
         ${
           item.note
-            ? `<button class="text-xs text-blue-500 mt-1" onclick="openItemNoteModal(${index})">${item.note}</button>`
+            ? `<button class="text-xs text-blue-500 mt-1" onclick="openItemNoteModal(${index})">${escHtml(item.note)}</button>`
             : `<button class="text-xs text-blue-500 mt-1" onclick="openItemNoteModal(${index})">Not Düzenle</button>`
         }
       </div>
@@ -2282,7 +2286,7 @@ function openImageViewer(productId, imageIndex = 0) {
         <div class="w-16 h-16 bg-white/10 rounded cursor-pointer ${idx === imageIndex ? 'ring-2 ring-white' : ''}"
              onclick="changeImage(${idx})">
             <img src="${url}" 
-                 alt="${product.urun_adi} - ${idx + 1}" 
+                 alt="${escHtml(product.urun_adi)} - ${idx + 1}" 
                  class="w-full h-full object-contain rounded"
                  onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\' viewBox=\'0 0 100 100\'><rect width=\'100%\' height=\'100%\' fill=\'#f3f4f6\'/></svg>');">
         </div>
@@ -2373,59 +2377,6 @@ function closeImageViewer() {
     currentProduct = null;
 }
 
-// Ağırlık ürünleri için sepete ekleme fonksiyonu (direkt ürün kartından)
-function validateAndAddToCartWeight(productId) {
-    const input = document.getElementById(`directQty_${productId}`);
-    const product = products.find(p => p.id === productId);
-    if (!product || product.olcum_birimi === 'adet') return; // Ensure it's a weight product
-
-    let value = parseFloat(input.value.replace(/\./g, '').replace(',', '.')) || 0; // Value is always in grams from this input
-    
-    if (value < 1) value = 0; // Allow 0 to remove from cart
-
-    let maxStockInGrams = product.olcum_birimi === 'kg' ? 
-        parseFloat(product.stok_miktari) * 1000 : 
-        parseFloat(product.stok_miktari);
-    
-    if (value > maxStockInGrams) {
-        alert('Yetersiz stok!');
-        value = maxStockInGrams;
-    }
-    input.value = value; // Update input with validated gram value
-
-    // Price per gram
-    let pricePerGram = product.olcum_birimi === 'kg' ?
-        parseFloat(product.satis_fiyati) / 1000 :
-        parseFloat(product.satis_fiyati);
-
-    const existingItemIndex = cart.findIndex(item => item.id === productId && item.olcumBirimi === 'gr');
-    
-    if (value === 0) {
-        if (existingItemIndex !== -1) {
-            cart.splice(existingItemIndex, 1);
-        }
-    } else {
-        if (existingItemIndex !== -1) {
-            cart[existingItemIndex].qty = value; // Update quantity in grams
-            cart[existingItemIndex].price = pricePerGram; // Ensure price is per gram
-    } else {
-        cart.push({
-            id: product.id,
-            name: product.urun_adi,
-                price: pricePerGram, // Price per gram
-                qty: value,          // Quantity in grams
-                olcumBirimi: 'gr',   // Selling unit is grams
-                note: ''
-        });
-    }
-    }
-    
-    updateCartCount();
-    renderCart();
-    // toggleCart(); // Optionally open cart
-}
-
-
 // Para birimi formatı için yardımcı fonksiyon
 function formatCurrency(value) {
     if (isNaN(parseFloat(value))) return '0,00 ₺';
@@ -2465,10 +2416,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const customerSearchInput = document.getElementById('customerSearch'); // Renamed to avoid conflict with main script's customerSearch element ID
     
     // Güvenlik kontrolleri
-    const productsData = typeof <?= json_encode($urunler, JSON_NUMERIC_CHECK) ?> !== 'undefined' ? 
-                         <?= json_encode($urunler, JSON_NUMERIC_CHECK) ?> : []; // Renamed
-    const customersData = typeof <?= json_encode($customerRows, JSON_NUMERIC_CHECK) ?> !== 'undefined' ? 
-                          <?= json_encode($customerRows, JSON_NUMERIC_CHECK) ?> : []; // Renamed
+    const productsData = typeof <?= $urunlerJson ?> !== 'undefined' ? 
+                         <?= json_encode($urunler, JSON_NUMERIC_CHECK | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> : []; // Renamed
+    const customersData = typeof <?= json_encode($customerRows, JSON_NUMERIC_CHECK | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> !== 'undefined' ? 
+                          <?= json_encode($customerRows, JSON_NUMERIC_CHECK | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> : []; // Renamed
     
     // Ürün arama fonksiyonu (Potentially conflicts with main script's searchInput listener)
     // searchInput.addEventListener('input', function() {
@@ -2501,7 +2452,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  onclick="addToCart(${product.id})"> {/* Call main addToCart with ID */}
                 <div class="aspect-square bg-gray-100 rounded-lg mb-2 overflow-hidden">
                     <img src="${product.resim_url || 'uploads/products/default.jpg'}" 
-                         alt="${product.urun_adi}"
+                         alt="${escHtml(product.urun_adi)}"
                          class="w-full h-full object-contain"
                          onerror="this.src='uploads/products/default.jpg'">
                 </div>
@@ -2530,7 +2481,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const searchText = customerSearchInput.value.trim();
         
         customerList.innerHTML = customersToDisplay.map(customer => {
-            const fullName = `${customer.ad} ${customer.soyad || ''}`;
+            const fullName = `${escHtml(customer.ad)} ${escHtml(customer.soyad || '')}`;
             const highlightedFullName = typeof highlightSearchResults === 'function' ? highlightSearchResults(fullName, searchText) : fullName;
             return `
             <button
@@ -2574,7 +2525,7 @@ function renderCustomers(searchTerm=''){
       onclick="selectCustomer(${m.id})"
       class="block w-full text-left p-3 hover:bg-gray-50 rounded-lg border-b border-gray-100"
     >
-      <div class="font-medium">${m.ad} ${m.soyad||''}</div>
+      <div class="font-medium">${escHtml(m.ad)} ${escHtml(m.soyad||'')}</div>
       <div class="text-sm text-gray-500" id="customerBalance_${m.id}">Bakiye yükleniyor...</div>
     </button>
   `).join('');
@@ -2650,7 +2601,7 @@ function renderCustomers(searchTerm=''){
       onclick="selectCustomer(${m.id})"
       class="block w-full text-left p-3 hover:bg-gray-50 rounded-lg border-b border-gray-100"
     >
-      <div class="font-medium">${m.ad} ${m.soyad||''}</div>
+      <div class="font-medium">${escHtml(m.ad)} ${escHtml(m.soyad||'')}</div>
       <div class="text-sm text-gray-500" id="customerBalance_${m.id}">Bakiye yükleniyor...</div>
     </button>
   `).join('');
@@ -2700,7 +2651,7 @@ function filterCustomersDropdown(searchTerm = '') {
         class="px-4 py-2 hover:bg-gray-100 cursor-pointer" 
         onclick="selectCustomerFromDropdown(${customer.id})"
       >
-        <div class="text-sm font-medium">${customer.ad} ${customer.soyad || ''}</div>
+        <div class="text-sm font-medium">${escHtml(customer.ad)} ${escHtml(customer.soyad || '')}</div>
           <div class="text-xs text-gray-500">${bakiyeHtml}</div>
       </div>
       `;
@@ -2865,98 +2816,79 @@ function updateItemPrice(itemIndex, newPrice) {
   renderCart();
 }
 
-// Ağırlık birimini değiştirme fonksiyonu
+// Ağırlık birimini değiştirme fonksiyonu (ürün kartı kg/gr butonu)
 function toggleWeightUnit(productId) {
   const toggleBtn = document.getElementById(`weightToggle_${productId}`);
   const inputField = document.getElementById(`directQty_${productId}`);
   if (!toggleBtn || !inputField) return;
-  
-  const currentUnit = toggleBtn.dataset.currentUnit;
+
+  const currentUnit = toggleBtn.dataset.currentUnit === 'kg' ? 'kg' : 'gr';
   const newUnit = currentUnit === 'gr' ? 'kg' : 'gr';
-  
-  // Birim değiştirilince değeri de dönüştür
-  const currentValue = parseFloat(inputField.value) || 0;
-  let newValue = 0;
-  
-  if (currentUnit === 'gr' && newUnit === 'kg') {
-    newValue = currentValue / 1000; // gr'dan kg'a çevir
-    inputField.step = 0.001;
-    inputField.min = 0.001;
-  } else {
-    newValue = currentValue * 1000; // kg'dan gr'a çevir
-    inputField.step = 1;
-    inputField.min = 1;
-  }
-  
-  // Yeni değeri input alanına yaz
-  inputField.value = newValue.toFixed(newUnit === 'kg' ? 3 : 0);
-  
-  // Buton metnini ve veri özelliğini güncelle
+  const currentValue = parseFloat(String(inputField.value).replace(',', '.')) || 0;
+  // Kullanıcı miktarı yazıp henüz onaylamadıysa (oninput -> dirty) yazdığı sayı YENİ birimde geçerlidir:
+  // "250" yazıp gr'a geçen kullanıcı 250 gr ister. Onaylanmış (sepetteki) miktar ise yeni birime çevrilir.
+  const yazilmisDeger = inputField.dataset && inputField.dataset.dirty === '1';
+
   toggleBtn.textContent = newUnit;
   toggleBtn.dataset.currentUnit = newUnit;
+  inputField.step = newUnit === 'kg' ? 0.001 : 1;
+  inputField.min = newUnit === 'kg' ? 0.001 : 1;
+
+  if (yazilmisDeger) {
+    validateAndAddToCartWeight(productId); // aynı sayıyı yeni birimle sepete yaz
+    return;
+  }
+
+  const newValue = Birim.yuvarla(Birim.miktarCevir(currentValue, currentUnit, newUnit), newUnit);
+  inputField.value = newUnit === 'kg' ? newValue.toFixed(3) : newValue.toFixed(0);
+
+  // Ürün sepette ağırlıkla varsa satırı yeni birime taşı (toplam tutar değişmez)
+  if (cart.some(item => item.id === productId && Birim.agirlikMi(item.olcumBirimi))) {
+    validateAndAddToCartWeight(productId);
+  }
 }
 
-// validateAndAddToCartWeight fonksiyonunu güncelleyelim
+// Ürün kartından ağırlık ürünü sepete ekleme/güncelleme
 function validateAndAddToCartWeight(productId) {
   const input = document.getElementById(`directQty_${productId}`);
   const toggleBtn = document.getElementById(`weightToggle_${productId}`);
   if (!input || !toggleBtn) return;
-  
+
   const product = products.find(p => p.id === productId);
-  if (!product) return;
-  
-  // Ağırlık birimi (gr veya kg)
-  const weightUnit = toggleBtn.dataset.currentUnit;
-  
-  // Kullanıcının girdiği değer
-  let value = parseFloat(input.value) || 0;
-  
-  // Minimum ve maksimum değer kontrolü
-  let minValue = weightUnit === 'kg' ? 0.001 : 1;
-  
-  if (value < minValue) {
-    value = minValue;
-    input.value = value;
-  }
-  
-  // Stok kontrolü - ağırlık birimlerini eşleştirerek
-  let stockInSelectedUnit;
-  if (weightUnit === 'kg') {
-    stockInSelectedUnit = product.olcum_birimi === 'gr' ? product.stok_miktari / 1000 : product.stok_miktari;
-  } else { // gr
-    stockInSelectedUnit = product.olcum_birimi === 'kg' ? product.stok_miktari * 1000 : product.stok_miktari;
-  }
-  
+  if (!product || !Birim.agirlikMi(product.olcum_birimi)) return;
+
+  // Seçili satış birimi (gr veya kg)
+  const weightUnit = toggleBtn.dataset.currentUnit === 'kg' ? 'kg' : 'gr';
+
+  let value = parseFloat(String(input.value).replace(',', '.')) || 0;
+  if (value < 0) value = 0;
+
+  // Stok kontrolü (seçili birim cinsinden)
+  const stockInSelectedUnit = Birim.miktarCevir(product.stok_miktari, product.olcum_birimi, weightUnit);
   if (value > stockInSelectedUnit) {
+    alert('Yetersiz stok!');
     value = stockInSelectedUnit;
-    input.value = weightUnit === 'kg' ? value.toFixed(3) : Math.floor(value);
   }
-  
-  // Sepete ekle
-  const existingItem = cart.findIndex(item => item.id === productId && item.olcumBirimi === weightUnit);
-  
-  if (value <= 0) {
-    // Değer 0 veya negatif ise, bu birimle varolan ürünü sepetten çıkar
-    if (existingItem !== -1) {
-      cart.splice(existingItem, 1);
-    }
-  } else {
-    if (existingItem !== -1) {
-      // Aynı birimle varolan ürünü güncelle
-      cart[existingItem].qty = value;
-    } else {
-      // Ürünü yeni bir kayıt olarak ekle
-      cart.push({
-        id: product.id,
-        name: product.urun_adi,
-        price: parseFloat(product.satis_fiyati),
-        qty: value,
-        olcumBirimi: weightUnit,
-        note: ''
-      });
-    }
+  value = Birim.yuvarla(value, weightUnit);
+  input.value = weightUnit === 'kg' ? value.toFixed(3) : value.toFixed(0);
+  if (input.dataset) delete input.dataset.dirty; // miktar onaylandı
+
+  // Karttan girilen miktar bu ürünün ağırlık satırının tamamıdır: eski birimdeki satırları kaldır.
+  const existing = cart.find(item => item.id === productId && Birim.agirlikMi(item.olcumBirimi));
+  const note = existing ? existing.note : '';
+  cart = cart.filter(item => !(item.id === productId && Birim.agirlikMi(item.olcumBirimi)));
+
+  if (value > 0) {
+    cart.push({
+      id: product.id,
+      name: product.urun_adi,
+      price: Birim.birimFiyat(product.satis_fiyati, product.olcum_birimi, weightUnit), // satış biriminin fiyatı
+      qty: value,
+      olcumBirimi: weightUnit,
+      note: note || ''
+    });
   }
-  
+
   updateCartCount();
   renderCart();
 }

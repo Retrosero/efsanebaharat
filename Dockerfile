@@ -7,6 +7,10 @@ RUN set -eux; \
     a2enmod rewrite headers; \
     rm -rf /var/lib/apt/lists/*
 
+COPY docker/apache-security.conf /etc/apache2/conf-available/zz-security.conf
+COPY docker/php-security.ini /usr/local/etc/php/conf.d/zz-security.ini
+RUN a2enconf zz-security
+
 WORKDIR /var/www/html
 
 COPY . /var/www/html

@@ -3,7 +3,7 @@
 function yetkiKontrol($sayfa, $yetki_turu = 'goruntuleme') {
     global $pdo;
     
-    if (!isset($_SESSION['user_id']) || !isset($_SESSION['rol_id'])) {
+    if (!isset($_SESSION['kullanici_id']) || !isset($_SESSION['rol_id'])) {
         return false;
     }
     
@@ -84,8 +84,8 @@ function bildirimEkle($kullanici_id, $mesaj, $tur = 'info') {
 function logKaydet($islem, $aciklama, $kullanici_id = null) {
     global $pdo;
     
-    if ($kullanici_id === null && isset($_SESSION['user_id'])) {
-        $kullanici_id = $_SESSION['user_id'];
+    if ($kullanici_id === null && isset($_SESSION['kullanici_id'])) {
+        $kullanici_id = $_SESSION['kullanici_id'];
     }
     
     try {

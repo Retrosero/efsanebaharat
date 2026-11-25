@@ -13,7 +13,7 @@ try {
     ");
     $kullanicilar = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e) {
-    echo "Hata: " . $e->getMessage();
+    error_log("kullanicilar.php: " . $e->getMessage());
     $kullanicilar = [];
 }
 
@@ -22,7 +22,7 @@ try {
     $stmt = $pdo->query("SELECT * FROM roller ORDER BY rol_adi");
     $roller = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e) {
-    echo "Hata: " . $e->getMessage();
+    error_log("kullanicilar.php: " . $e->getMessage());
     $roller = [];
 }
 
@@ -30,7 +30,11 @@ try {
 if (isset($_GET['sil']) && is_numeric($_GET['sil'])) {
     $kullanici_id = intval($_GET['sil']);
     
-    try {
+    if (!csrfTokenGecerli($_GET['csrf'] ?? '')) {
+        $hata_mesaji = "Geçersiz istek. Lütfen sayfayı yenileyip tekrar deneyin.";
+    } elseif ($kullanici_id === (int)$_SESSION['kullanici_id']) {
+        $hata_mesaji = "Kendi hesabınızı silemezsiniz.";
+    } else try {
         $stmt = $pdo->prepare("DELETE FROM kullanicilar WHERE id = :id");
         $stmt->execute([':id' => $kullanici_id]);
         
@@ -165,7 +169,7 @@ if (isset($_GET['mesaj'])) {
 <script>
 function silmeOnayi(id, kullaniciAdi) {
     document.getElementById('silinecekKullanici').textContent = kullaniciAdi;
-    document.getElementById('silBtn').href = 'kullanicilar.php?sil=' + id;
+    document.getElementById('silBtn').href = 'kullanicilar.php?sil=' + encodeURIComponent(id) + '&csrf=' + <?= json_encode($_SESSION['csrf_token']) ?>;
     
     const modal = document.getElementById('silmeModal');
     modal.classList.remove('hidden');

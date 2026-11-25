@@ -130,17 +130,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 foreach ($files as $index => $file) {
                     if ($file['error'] == 0 && $index < 10) {
-                        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-                        $filename = $file['name'];
-                        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-                        
-                        if (in_array($ext, $allowed)) {
-                            $newFilename = uniqid() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-                            $uploadPath = $uploadDir . $newFilename;
-                            
-                            if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
-                                $resim_urls[$index] = $uploadPath;
-                            }
+                        // Uzantı + içerik doğrulaması ile güvenli yükleme
+                        $uploadPath = guvenliResimYukle($file, $uploadDir);
+                        if ($uploadPath !== false) {
+                            $resim_urls[$index] = $uploadPath;
                         }
                     }
                 }

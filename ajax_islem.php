@@ -8,6 +8,13 @@ header('Content-Type: application/json');
 $islem = isset($_POST['islem']) ? $_POST['islem'] : (isset($_GET['islem']) ? $_GET['islem'] : '');
 $id = isset($_POST['id']) ? intval($_POST['id']) : (isset($_GET['id']) ? intval($_GET['id']) : 0);
 
+// Silme gibi veri değiştiren işlemler yalnızca POST ile yapılabilir (GET ile CSRF engellenir)
+if (in_array($islem, ['tahsilat_sil', 'fatura_sil'], true) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Bu işlem için POST gereklidir']);
+    exit;
+}
+
 if (empty($islem)) {
     echo json_encode(['success' => false, 'message' => 'İşlem belirtilmedi']);
     exit;

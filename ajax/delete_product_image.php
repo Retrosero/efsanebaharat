@@ -9,12 +9,15 @@ try {
     $json = file_get_contents('php://input');
     $data = json_decode($json, true);
 
-    if (!isset($data['urun_id']) || !isset($data['resim_index'])) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !is_array($data) || !isset($data['urun_id']) || !isset($data['resim_index'])) {
         throw new Exception('Gerekli parametreler eksik');
     }
 
     $urun_id = intval($data['urun_id']);
     $resim_index = intval($data['resim_index']);
+    if ($resim_index < 0 || $resim_index > 10) {
+        throw new Exception('Geçersiz resim numarası');
+    }
 
     // Ürünü ve resmi kontrol et
     if ($resim_index === 0) {
@@ -35,8 +38,8 @@ try {
     $eski_resim = $urun[$resim_kolonu];
 
     // Eski resmi fiziksel olarak sil
-    if (!empty($eski_resim) && file_exists($eski_resim)) {
-        @unlink($eski_resim);
+    if (!empty($eski_resim)) {
+        guvenliYuklemeSil($eski_resim); // yalnızca uploads/ altındaki dosyalar silinebilir
     }
 
     // Veritabanından resim referansını sil

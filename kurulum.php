@@ -3,6 +3,7 @@
 
 // Veritabanı bağlantısı
 require_once 'includes/db.php';
+yoneticiGerekli(); // Bakım/kurulum betiği: sadece yönetici
 
 // Hata mesajlarını göster
 ini_set('display_errors', 1);

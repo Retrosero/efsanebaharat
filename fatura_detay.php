@@ -1110,7 +1110,7 @@ else if ($print_mode) {
 <script>
   const items = <?= $itemsJson ?>;
   // Fatura tablosundaki ürün notunu (common note) kullanıyoruz
-  const productNote = <?= json_encode($fatura['aciklama']) ?>;
+  const productNote = <?= json_encode($fatura['aciklama'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
   // Sayfa yüklendiğinde çalışacak kodlar
   document.addEventListener('DOMContentLoaded', function() {
