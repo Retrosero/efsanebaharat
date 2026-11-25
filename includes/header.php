@@ -225,6 +225,11 @@ if (!in_array($current_page, $exempt_pages)) {
       display: none;
     }
     
+    /* Menü daraltıldığında kategori başlıkları yerine ince ayraç göster */
+    #sideNav.collapsed .menu-ayrac {
+      display: block;
+    }
+
     /* Menü collapsed olduğunda genişliği küçült */
     #sideNav.collapsed {
       width: 4rem !important;
@@ -396,116 +401,68 @@ if (!in_array($current_page, $exempt_pages)) {
     
     <div class="flex-1 overflow-y-auto">
       <div class="p-2">
-        <!-- Menü Linkleri -->
-        <?php if (sayfaErisimKontrol($pdo, 'index.php')): ?>
-        <a href="index.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Dashboard">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-dashboard-line"></i>
-          </div>
-          <span class="nav-text">Dashboard</span>
-        </a>
-        <a href="urunler.php?kritik=1" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Kritik Stok">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-alert-line"></i>
-          </div>
-          <span class="nav-text">Kritik Stok</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'satis.php')): ?>
-        <a href="satis.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Satış">
-          <i class="ri-shopping-cart-line text-xl"></i>
-          <span class="nav-text">Satış</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'alis.php')): ?>
-        <a href="alis.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Alış">
-          <i class="ri-shopping-basket-line text-xl"></i>
-          <span class="nav-text">Alış</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'alis_faturalari.php')): ?>
-        <a href="alis_faturalari.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Alış Faturaları">
-          <i class="ri-file-list-line text-xl"></i>
-          <span class="nav-text">Alış Faturaları</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'tahsilat.php')): ?>
-        <a href="tahsilat.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Tahsilat">
-          <i class="ri-money-dollar-circle-line text-xl"></i>
-          <span class="nav-text">Tahsilat</span>
-        </a>
-        <?php endif; ?>
-        
+        <!-- Menü Linkleri (kategorili) -->
+        <?php
+        // 'yetki' => erişim kontrolünün yapıldığı sayfa, 'aktif' => vurgulanacak sayfa(lar)
+        $menuKategorileri = [
+            'Genel' => [
+                ['url' => 'index.php', 'ad' => 'Dashboard', 'ikon' => 'ri-dashboard-line', 'yetki' => 'index.php'],
+            ],
+            'Satış' => [
+                ['url' => 'satis.php', 'ad' => 'Satış', 'ikon' => 'ri-shopping-cart-line', 'yetki' => 'satis.php'],
+                ['url' => 'tahsilat.php', 'ad' => 'Tahsilat', 'ikon' => 'ri-money-dollar-circle-line', 'yetki' => 'tahsilat.php'],
+            ],
+            'Alış' => [
+                ['url' => 'alis.php', 'ad' => 'Alış', 'ikon' => 'ri-shopping-basket-line', 'yetki' => 'alis.php'],
+                ['url' => 'alis_faturalari.php', 'ad' => 'Alış Faturaları', 'ikon' => 'ri-file-list-line', 'yetki' => 'alis_faturalari.php'],
+            ],
+            'Stok' => [
+                ['url' => 'urunler.php', 'ad' => 'Ürünler', 'ikon' => 'ri-store-2-line', 'yetki' => 'urunler.php'],
+                ['url' => 'urunler.php?kritik=1', 'ad' => 'Kritik Stok', 'ikon' => 'ri-alert-line', 'yetki' => 'index.php'],
+            ],
+            'Cari' => [
+                ['url' => 'musteriler.php', 'ad' => 'Müşteriler', 'ikon' => 'ri-user-3-line', 'yetki' => 'musteriler.php'],
+            ],
+            'Raporlar' => [
+                ['url' => 'raporlar.php', 'ad' => 'Raporlar', 'ikon' => 'ri-bar-chart-2-line', 'yetki' => 'raporlar.php'],
+                ['url' => 'gunsonu.php', 'ad' => 'Gün Sonu', 'ikon' => 'ri-file-chart-line', 'yetki' => 'gunsonu.php'],
+            ],
+            'Yönetim' => [
+                ['url' => 'kullanicilar.php', 'ad' => 'Kullanıcılar', 'ikon' => 'ri-user-settings-line', 'yetki' => 'kullanicilar.php'],
+                ['url' => 'roller.php', 'ad' => 'Roller', 'ikon' => 'ri-shield-user-line', 'yetki' => 'roller.php'],
+                ['url' => 'ayarlar.php', 'ad' => 'Ayarlar', 'ikon' => 'ri-settings-line', 'yetki' => 'ayarlar.php'],
+            ],
+        ];
 
-        
-        <?php if (sayfaErisimKontrol($pdo, 'urunler.php')): ?>
-        <a href="urunler.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Ürünler">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-store-2-line"></i>
-          </div>
-          <span class="nav-text">Ürünler</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'musteriler.php')): ?>
-        <a href="musteriler.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Müşteriler">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-user-3-line"></i>
-          </div>
-          <span class="nav-text">Müşteriler</span>
-        </a>
-        <?php endif; ?>
-        
+        $menuAktifSayfa = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        $menuKritik = isset($_GET['kritik']) && $_GET['kritik'] == '1';
+        $menuIlkKategori = true;
 
-        
-        <?php if (sayfaErisimKontrol($pdo, 'kullanicilar.php')): ?>
-        <a href="kullanicilar.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Kullanıcılar">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-user-settings-line"></i>
-          </div>
-          <span class="nav-text">Kullanıcılar</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'roller.php')): ?>
-        <a href="roller.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Roller">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-shield-user-line"></i>
-          </div>
-          <span class="nav-text">Roller</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'raporlar.php')): ?>
-        <a href="#" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Raporlar">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-file-chart-line"></i>
-          </div>
-          <span class="nav-text">Raporlar</span>
-        </a>
-        <?php endif; ?>
-
-        <?php if (sayfaErisimKontrol($pdo, 'gunsonu.php')): ?>
-        <a href="gunsonu.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Gün Sonu">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-file-chart-line"></i>
-          </div>
-          <span class="nav-text">Gün Sonu</span>
-        </a>
-        <?php endif; ?>
-        
-        <?php if (sayfaErisimKontrol($pdo, 'ayarlar.php')): ?>
-        <a href="ayarlar.php" class="tooltip flex items-center space-x-3 p-3 rounded hover:bg-white/10 mb-1" data-tooltip="Ayarlar">
-          <div class="w-5 h-5 flex items-center justify-center">
-            <i class="ri-settings-line"></i>
-          </div>
-          <span class="nav-text">Ayarlar</span>
-        </a>
-        <?php endif; ?>
+        foreach ($menuKategorileri as $kategoriAdi => $ogeler):
+            $gorunurOgeler = array_filter($ogeler, fn($o) => sayfaErisimKontrol($pdo, $o['yetki']));
+            if (!$gorunurOgeler) {
+                continue; // yetkili öğesi olmayan kategoriyi tamamen gizle
+            }
+        ?>
+        <div class="menu-kategori<?= $menuIlkKategori ? '' : ' mt-3' ?>">
+          <div class="nav-text px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/60"><?= htmlspecialchars($kategoriAdi) ?></div>
+          <?php if (!$menuIlkKategori): ?><div class="menu-ayrac hidden border-t border-white/10 mx-2 mb-2"></div><?php endif; ?>
+          <?php foreach ($gorunurOgeler as $oge):
+              $ogeSayfa = strtok($oge['url'], '?');
+              $ogeKritik = strpos($oge['url'], 'kritik=1') !== false;
+              $aktif = $menuAktifSayfa === $ogeSayfa && $ogeKritik === ($ogeSayfa === 'urunler.php' && $menuKritik);
+          ?>
+          <a href="<?= htmlspecialchars($oge['url']) ?>"
+             class="tooltip flex items-center space-x-3 p-3 rounded mb-1 <?= $aktif ? 'bg-white/20 font-medium' : 'hover:bg-white/10' ?>"
+             data-tooltip="<?= htmlspecialchars($oge['ad']) ?>"<?= $aktif ? ' aria-current="page"' : '' ?>>
+            <div class="w-5 h-5 flex items-center justify-center">
+              <i class="<?= $oge['ikon'] ?> text-lg"></i>
+            </div>
+            <span class="nav-text"><?= htmlspecialchars($oge['ad']) ?></span>
+          </a>
+          <?php endforeach; ?>
+        </div>
+        <?php $menuIlkKategori = false; endforeach; ?>
       </div>
     </div>
     

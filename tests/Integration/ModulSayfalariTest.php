@@ -108,4 +108,39 @@ final class ModulSayfalariTest extends IntegrationTestCase
         libxml_use_internal_errors(true);
         $this->assertNotFalse(simplexml_load_string($r['body']), 'XML ayrıştırılamadı: ' . substr($r['body'], 0, 200));
     }
+
+    public function testSolMenuKategorilereAyrilmistir(): void
+    {
+        $this->girisYap();
+        $r = $this->get('satis.php');
+        $this->assertSame(200, $r['status']);
+        $govde = $r['body'];
+        $sira = [];
+        foreach (['Genel', 'Satış', 'Alış', 'Stok', 'Cari', 'Raporlar', 'Yönetim'] as $kategori) {
+            $konum = strpos($govde, '>' . $kategori . '</div>');
+            $this->assertNotFalse($konum, "Menüde '$kategori' kategorisi yok");
+            $sira[] = $konum;
+        }
+        $siraliKopya = $sira;
+        sort($siraliKopya);
+        $this->assertSame($siraliKopya, $sira, 'Kategoriler beklenen sırada değil');
+        // Raporlar bağlantısı artık gerçek sayfaya gider, aktif sayfa işaretlenir
+        $this->assertStringContainsString('href="raporlar.php"', $govde);
+        $this->assertMatchesRegularExpression('#<a href="satis\.php"[^>]*aria-current="page"#s', $govde);
+    }
+
+    public function testCalisanYetkisizKategorileriGormez(): void
+    {
+        // Çalışan rolünden tüm sayfa izinlerini kaldır: yalnızca yetkili öğeler/kategoriler görünmeli
+        self::$pdo->exec('DELETE FROM rol_sayfa_izinleri WHERE rol_id = 2');
+        $sayfa = self::$pdo->query("SELECT id FROM sayfalar WHERE sayfa_url = 'index.php'")->fetchColumn();
+        self::$pdo->prepare('INSERT INTO rol_sayfa_izinleri (rol_id, sayfa_id, izin) VALUES (2, ?, 1)')->execute([$sayfa]);
+
+        $this->girisYap(self::CALISAN_EPOSTA);
+        $r = $this->get('index.php');
+        $this->assertSame(200, $r['status']);
+        $this->assertStringContainsString('>Genel</div>', $r['body']);
+        $this->assertStringNotContainsString('>Yönetim</div>', $r['body']);
+        $this->assertStringNotContainsString('href="kullanicilar.php"', $r['body']);
+    }
 }
