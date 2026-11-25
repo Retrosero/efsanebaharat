@@ -28,10 +28,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: index.php');
                 exit;
             } else {
-                $error = 'Geçersiz e-posta veya şifre.';
+                $error = girisKilitliMi()
+                    ? 'Çok fazla hatalı deneme yaptınız. Lütfen 15 dakika sonra tekrar deneyin.'
+                    : 'Geçersiz e-posta veya şifre.';
             }
         } catch (PDOException $e) {
-            $error = 'Giriş yapılırken bir hata oluştu: ' . $e->getMessage();
+            error_log('Giriş hatası: ' . $e->getMessage());
+            $error = 'Giriş yapılırken bir hata oluştu.';
         }
     }
 }

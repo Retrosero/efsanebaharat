@@ -140,13 +140,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // İlk resmi resim_url alanına kaydet
         if (!empty($_FILES['resim_1']['name'])) {
-            $dosya_adi = uniqid() . "_" . basename($_FILES['resim_1']["name"]);
-            $hedef_dosya = $hedef_klasor . $dosya_adi;
+            // Uzantı + içerik (getimagesize) doğrulaması, rastgele dosya adı
+            $hedef_dosya = guvenliResimYukle($_FILES['resim_1'], $hedef_klasor);
             
-            if (move_uploaded_file($_FILES['resim_1']["tmp_name"], $hedef_dosya)) {
-                // Eski resmi sil
+            if ($hedef_dosya !== false) {
+                // Eski resmi sil (yalnızca uploads/ altındaysa)
                 if (!empty($urun['resim_url'])) {
-                    @unlink($urun['resim_url']);
+                    guvenliYuklemeSil($urun['resim_url']);
                 }
                 
                 // Yeni resim yolunu kaydet
@@ -161,14 +161,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Diğer resimleri resim_url_1 den başlayarak kaydet
         for($i = 2; $i <= 10; $i++) {
             if (!empty($_FILES['resim_' . $i]['name'])) {
-                $dosya_adi = uniqid() . "_" . basename($_FILES['resim_' . $i]["name"]);
-                $hedef_dosya = $hedef_klasor . $dosya_adi;
+                $hedef_dosya = guvenliResimYukle($_FILES['resim_' . $i], $hedef_klasor);
                 
-                if (move_uploaded_file($_FILES['resim_' . $i]["tmp_name"], $hedef_dosya)) {
+                if ($hedef_dosya !== false) {
                     // Eski resmi sil
                     $resim_index = $i - 1;
                     if (!empty($urun['resim_url_' . $resim_index])) {
-                        @unlink($urun['resim_url_' . $resim_index]);
+                        guvenliYuklemeSil($urun['resim_url_' . $resim_index]);
                     }
                     
                     // Yeni resim yolunu kaydet
@@ -202,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php if (isset($_SESSION['hata_mesaji'])): ?>
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <span class="block sm:inline"><?= $_SESSION['hata_mesaji'] ?></span>
+            <span class="block sm:inline"><?= htmlspecialchars($_SESSION['hata_mesaji']) ?></span>
         </div>
         <?php unset($_SESSION['hata_mesaji']); ?>
     <?php endif; ?>

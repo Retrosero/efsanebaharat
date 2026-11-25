@@ -34,3 +34,6 @@ yarn-error.log
 *.backup
 *.bak
 *.old 
+# Test
+.phpunit.cache/
+.phpunit.result.cache

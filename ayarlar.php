@@ -719,7 +719,7 @@ $kategoriler = $pdo->query("SELECT * FROM kategoriler ORDER BY kategori_adi")->f
                                                     }
                                                     echo '</td>';
                                                     echo '<td class="px-4 py-3 whitespace-nowrap text-sm text-right">';
-                                                    echo '<button onclick=\'openEditCustomerTypeModal(' . json_encode($tip) . ')\' class="text-blue-600 hover:text-blue-900 mr-3"><i class="ri-edit-line"></i></button>';
+                                                    echo '<button onclick=\'openEditCustomerTypeModal(' . htmlspecialchars(json_encode($tip), ENT_QUOTES, 'UTF-8') . ')\' class="text-blue-600 hover:text-blue-900 mr-3"><i class="ri-edit-line"></i></button>';
                                                     echo '<form method="POST" action="" class="inline-block" onsubmit="return confirm(\'Bu müşteri tipini silmek istediğinizden emin misiniz?\')">';
                                                     echo '<input type="hidden" name="action" value="delete_customer_type">';
                                                     echo '<input type="hidden" name="tip_id" value="' . $tip['id'] . '">';
@@ -780,7 +780,7 @@ $kategoriler = $pdo->query("SELECT * FROM kategoriler ORDER BY kategori_adi")->f
                                                     }
                                                     echo '</td>';
                                                     echo '<td class="px-4 py-3 whitespace-nowrap text-sm text-right">';
-                                                    echo '<button onclick=\'openEditBrandModal(' . json_encode($marka) . ')\' class="text-blue-600 hover:text-blue-900 mr-3"><i class="ri-edit-line"></i></button>';
+                                                    echo '<button onclick=\'openEditBrandModal(' . htmlspecialchars(json_encode($marka), ENT_QUOTES, 'UTF-8') . ')\' class="text-blue-600 hover:text-blue-900 mr-3"><i class="ri-edit-line"></i></button>';
                                                     echo '<form method="POST" action="" class="inline-block" onsubmit="return confirm(\'Bu markayı silmek istediğinizden emin misiniz?\')">';
                                                     echo '<input type="hidden" name="action" value="delete_brand">';
                                                     echo '<input type="hidden" name="marka_id" value="' . $marka['id'] . '">';
@@ -842,7 +842,7 @@ $kategoriler = $pdo->query("SELECT * FROM kategoriler ORDER BY kategori_adi")->f
                                                     echo '</td>';
                                                     echo '<td class="px-4 py-3 whitespace-nowrap text-sm text-right">';
                                                     echo '<button onclick="openAddSubcategoryModal(' . $kategori['id'] . ', \'' . htmlspecialchars($kategori['kategori_adi']) . '\')" class="text-green-600 hover:text-green-900 mr-3" title="Alt Kategori Ekle"><i class="ri-add-circle-line"></i></button>';
-                                                    echo '<button onclick=\'openEditCategoryModal(' . json_encode($kategori) . ')\' class="text-blue-600 hover:text-blue-900 mr-3" title="Düzenle"><i class="ri-edit-line"></i></button>';
+                                                    echo '<button onclick=\'openEditCategoryModal(' . htmlspecialchars(json_encode($kategori), ENT_QUOTES, 'UTF-8') . ')\' class="text-blue-600 hover:text-blue-900 mr-3" title="Düzenle"><i class="ri-edit-line"></i></button>';
                                                     echo '<form method="POST" action="" class="inline-block" onsubmit="return confirm(\'Bu kategoriyi silmek istediğinizden emin misiniz?\')">';
                                                     echo '<input type="hidden" name="action" value="delete_category">';
                                                     echo '<input type="hidden" name="kategori_id" value="' . $kategori['id'] . '">';
@@ -868,7 +868,7 @@ $kategoriler = $pdo->query("SELECT * FROM kategoriler ORDER BY kategori_adi")->f
                                                             }
                                                             echo '</td>';
                                                             echo '<td class="px-4 py-3 whitespace-nowrap text-sm text-right">';
-                                                            echo '<button onclick=\'openEditSubcategoryModal(' . json_encode($altKategori) . ', ' . $kategori['id'] . ')\' class="text-blue-600 hover:text-blue-900 mr-3" title="Düzenle"><i class="ri-edit-line"></i></button>';
+                                                            echo '<button onclick=\'openEditSubcategoryModal(' . htmlspecialchars(json_encode($altKategori), ENT_QUOTES, 'UTF-8') . ', ' . $kategori['id'] . ')\' class="text-blue-600 hover:text-blue-900 mr-3" title="Düzenle"><i class="ri-edit-line"></i></button>';
                                                             echo '<form method="POST" action="" class="inline-block" onsubmit="return confirm(\'Bu alt kategoriyi silmek istediğinizden emin misiniz?\')">';
                                                             echo '<input type="hidden" name="action" value="delete_subcategory">';
                                                             echo '<input type="hidden" name="alt_kategori_id" value="' . $altKategori['id'] . '">';
@@ -931,7 +931,7 @@ $kategoriler = $pdo->query("SELECT * FROM kategoriler ORDER BY kategori_adi")->f
                                                     }
                                                     echo '</td>';
                                                     echo '<td class="px-4 py-3 whitespace-nowrap text-sm text-right">';
-                                                    echo '<button onclick=\'openEditBankModal(' . json_encode($banka) . ')\' class="text-blue-600 hover:text-blue-900 mr-3"><i class="ri-edit-line"></i></button>';
+                                                    echo '<button onclick=\'openEditBankModal(' . htmlspecialchars(json_encode($banka), ENT_QUOTES, 'UTF-8') . ')\' class="text-blue-600 hover:text-blue-900 mr-3"><i class="ri-edit-line"></i></button>';
                                                     echo '<form method="POST" action="" class="inline-block" onsubmit="return confirm(\'Bu bankayı silmek istediğinizden emin misiniz?\')">';
                                                     echo '<input type="hidden" name="action" value="delete_bank">';
                                                     echo '<input type="hidden" name="banka_id" value="' . $banka['id'] . '">';

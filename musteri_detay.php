@@ -1413,8 +1413,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
-const hareketFaturaDetayMap = <?= json_encode($hareketFaturaDetaylariMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-const hareketPdfMusteriAdi = <?= json_encode($adSoyad, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const hareketFaturaDetayMap = <?= json_encode($hareketFaturaDetaylariMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const hareketPdfMusteriAdi = <?= json_encode($adSoyad, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
 function exportDetailedHareketlerPdf() {
   const table = document.getElementById('hareketlerTable');

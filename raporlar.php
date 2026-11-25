@@ -462,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('karlilikGrafigi').getContext('2d');
     
     // PHP'den gelen verileri JSON formatına dönüştürme
-    const karlilikVerileri = <?= json_encode($karlilik_verileri) ?>;
+    const karlilikVerileri = <?= json_encode($karlilik_verileri, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const raporTipi = '<?= $rapor_tipi ?>';
     
     // Grafik verileri

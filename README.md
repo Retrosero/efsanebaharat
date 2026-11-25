@@ -66,3 +66,32 @@ UPDATE `stok_hareketleri` SET `olcum_birimi` = 'adet';
 3. Kg ile alınan ürünleri gram olarak satmak için, satış ekranında birim seçimini "gr" olarak değiştirin
 
 Bu güncelleme sayesinde, özellikle baharat gibi ürünleri kg ile alıp gram ile satabilirsiniz. 
+## Testler
+
+```bash
+# JS (birim dönüşümleri + satış ekranı kg/gr davranışı)
+npm test
+
+# PHP birim + entegrasyon testleri (MariaDB + uygulama Docker'da ayağa kalkar)
+docker compose -p efsanetest -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+docker compose -p efsanetest -f docker-compose.test.yml down -v
+```
+
+## Cloudflare R2: resimler ve veritabanı yedekleri
+
+1. Cloudflare panelinde iki kova oluşturun:
+   - `efsane-resimler`: **Settings > Public access** açın (r2.dev adresi veya özel alan adı).
+   - `efsane-yedekler`: herkese açık erişim **kapalı** kalsın (yedeklerde müşteri verisi var).
+2. **R2 > Manage R2 API Tokens** ile iki kovaya "Object Read & Write" yetkili bir token oluşturun.
+3. Coolify'da uygulamanın ortam değişkenlerine `.env.example` içindeki `R2_*` değerlerini girin ve yeniden dağıtın.
+   Bundan sonra yüklenen ürün resimleri doğrudan R2'ye gider.
+4. Mevcut resimleri taşıyın (önce `--kuru` ile kontrol edin):
+   ```bash
+   php cron/resimleri_r2ye_tasi.php --kuru
+   php cron/resimleri_r2ye_tasi.php --kaynak-url=https://panel.efsanebaharat.com
+   ```
+   `--kaynak-url`, sunucuda bulunmayan dosyaları bu siteden indirip taşır. Tekrar çalıştırmak güvenlidir.
+5. Otomatik yedek: Coolify > uygulama > **Scheduled Tasks**: komut
+   `php /var/www/html/cron/veritabani_yedekle.php`, sıklık `0 3 * * *` (her gece 03:00).
+   Yedekler panelde **Yönetim > Yedekler** sayfasından listelenir, elle alınır ve indirilir.
+   Geri yükleme: `gunzip -c yedek.sql.gz | mysql -u KULLANICI -p VERITABANI`

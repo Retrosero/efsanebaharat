@@ -39,7 +39,9 @@ if (isset($_GET['sil']) && is_numeric($_GET['sil'])) {
     $rol_id = intval($_GET['sil']);
     
     // Yönetici rolü silinemez
-    if ($rol_id === 1) {
+    if (!csrfTokenGecerli($_GET['csrf'] ?? '')) {
+        $hata_mesaji = "Geçersiz istek. Lütfen sayfayı yenileyip tekrar deneyin.";
+    } elseif ($rol_id === 1) {
         $hata_mesaji = "Yönetici rolü silinemez.";
     } else {
         try {
@@ -366,7 +368,7 @@ function izinDuzenle(rolId, rolAdi) {
     
     // Rol izinlerini yükle
     <?php if (!empty($rol_izinleri)): ?>
-        const rolIzinleri = <?= json_encode($rol_izinleri) ?>;
+        const rolIzinleri = <?= json_encode($rol_izinleri, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         
         if (rolIzinleri[rolId]) {
             for (const sayfaId in rolIzinleri[rolId]) {
@@ -388,7 +390,7 @@ function izinDuzenle(rolId, rolAdi) {
 // Silme onay modalını aç
 function silmeOnayi(id, rolAdi) {
     document.getElementById('silinecekRol').textContent = rolAdi;
-    document.getElementById('silBtn').href = 'roller.php?sil=' + id;
+    document.getElementById('silBtn').href = 'roller.php?sil=' + encodeURIComponent(id) + '&csrf=' + <?= json_encode($_SESSION['csrf_token']) ?>;
     
     const modal = document.getElementById('silmeModal');
     modal.classList.remove('hidden');

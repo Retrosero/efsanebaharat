@@ -1,6 +1,7 @@
 <?php
 // stok_kg_ekle.php
 require_once 'includes/db.php';
+yoneticiGerekli(); // Bakım/kurulum betiği: sadece yönetici
 include 'includes/header.php';
 
 $isSuccess = false;

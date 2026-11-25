@@ -1,11 +1,6 @@
 <?php
 // fatura_detay.php
 
-// Hata ayıklama
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 require_once 'includes/db.php';
 
 // Modal modu kontrolü
@@ -1059,7 +1054,7 @@ else if ($print_mode) {
 
 <!-- Tüm içeriği kaplayan ana container -->
 <div class="w-full">
-    <!-- Butonlar -->  <div class="flex justify-between items-center mb-6 print:hidden">    <div class="flex space-x-2">      <button         id="backButton"        onclick="history.back()"         class="flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"      >        <i class="ri-arrow-left-line mr-2"></i> Geri      </button>    </div>        <div class="flex space-x-2">      <!-- Düzenle Butonu -->      <a         href="fatura_duzenle.php?id=<?= $fatura_id ?>"         class="flex items-center px-4 py-2 bg-blue-50 text-primary hover:bg-blue-100 rounded-button text-sm"      >        <i class="ri-edit-line mr-2"></i> Düzenle      </a>            <!-- Sil Butonu -->      <button         type="button"        id="deleteButton"        class="flex items-center px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-button text-sm"      >        <i class="ri-delete-bin-line mr-2"></i> Sil      </button>            <!-- Yazdır Butonu - iyileştirilmiş -->      <button         id="printButton"        class="flex items-center px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-button text-sm"      >        <i class="ri-printer-line mr-2"></i> Yazdır      </button>            <!-- Dışa Aktar Butonu -->      <div class="relative">        <button           id="exportBtn"          class="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"        >          <i class="ri-download-line mr-2"></i> Dışa Aktar        </button>        <div id="exportMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-10 border border-gray-200">          <a href="#" onclick="exportAs('pdf')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF olarak indir</a>          <a href="#" onclick="exportAs('xlsx')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel olarak indir</a>          <a href="#" onclick="exportAs('png')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Görüntü olarak indir</a>        </div>      </div>    </div>  </div>
+    <!-- Butonlar -->  <div class="flex justify-between items-center mb-6 print:hidden">    <div class="flex space-x-2">      <button         id="backButton"        onclick="history.back()"         class="flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"      >        <i class="ri-arrow-left-line mr-2"></i> Geri      </button>    </div>        <div class="flex space-x-2">      <!-- Düzenle Butonu -->      <a         href="fatura_duzenle.php?id=<?= $fatura_id ?>"         class="flex items-center px-4 py-2 bg-blue-50 text-primary hover:bg-blue-100 rounded-button text-sm"      >        <i class="ri-edit-line mr-2"></i> Düzenle      </a>            <!-- Sil Butonu -->      <button         type="button"        id="deleteButton"        class="flex items-center px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-button text-sm"      >        <i class="ri-delete-bin-line mr-2"></i> Sil      </button>            <!-- Yazdır Butonu - iyileştirilmiş -->      <button         id="printButton"        class="flex items-center px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-button text-sm"      >        <i class="ri-printer-line mr-2"></i> Yazdır      </button>            <!-- Dışa Aktar Butonu -->      <div class="relative">        <button           id="exportBtn"          class="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-button text-sm"        >          <i class="ri-download-line mr-2"></i> Dışa Aktar        </button>        <div id="exportMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-10 border border-gray-200">          <a href="#" onclick="exportAs('pdf'); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF olarak indir</a>          <a href="#" onclick="exportAs('xlsx'); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel olarak indir</a>          <a href="#" onclick="exportAs('png'); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Görüntü olarak indir</a>        </div>      </div>    </div>  </div>
 
     <!-- İçerik -->  <div class="bg-white border border-gray-200 rounded shadow-sm mx-4 mb-4" id="invoiceContainer">    <!-- Fatura Başlık Alanı -->    <div class="p-6 flex flex-col sm:flex-row justify-between border-b">      <!-- Sol taraf - Firma/Uygulama Bilgisi -->      <div class="mb-4 sm:mb-0">        <h1 class="text-2xl font-bold text-primary">Efsane Baharat</h1>        <p class="text-gray-500 mt-1">Baharatlar & Kuruyemişler</p>      </div>            <!-- Sağ taraf - Fatura Bilgisi -->      <div class="text-right">        <h2 class="text-xl font-semibold"><?= $faturaTuruBaslik ?></h2>        <p class="text-secondary mt-1">Fatura No: <span class="font-medium">#<?= htmlspecialchars($faturaNo) ?></span></p>        <p class="text-gray-500 mt-1">Tarih: <?= date('d.m.Y', strtotime($fatura['fatura_tarihi'])) ?></p>      </div>    </div>        <!-- Gönderen ve Alıcı Bilgileri -->    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b">      <!-- Gönderen/Alıcı Bilgisi -->      <div>      </div>            <!-- Müşteri/Tedarikçi Bilgisi -->      <div>        <h3 class="font-medium text-gray-700 mb-2"><?= $firmaEtiketi ?> Bilgileri</h3>        <p class="text-gray-900 font-semibold"><?= htmlspecialchars($fatura['firma_ad'] . ' ' . $fatura['firma_soyad']) ?></p>        <?php if (!empty($fatura['adres'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['adres']) ?></p>        <?php endif; ?>        <?php if (!empty($fatura['telefon'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['telefon']) ?></p>        <?php endif; ?>        <?php if (!empty($fatura['email'])): ?>          <p class="text-gray-600"><?= htmlspecialchars($fatura['email']) ?></p>        <?php endif; ?>      </div>    </div>        <?php if (!empty($orderNote)): ?>    <!-- Sipariş Notu -->    <div class="p-6 border-b">      <div class="bg-blue-50 p-4 rounded">        <h3 class="font-medium text-blue-800 mb-1">Sipariş Notu</h3>        <p class="text-blue-700"><?= nl2br(htmlspecialchars($orderNote)) ?></p>      </div>    </div>    <?php endif; ?>    <!-- Ürün Tablosu -->    <div class="p-6">      <!-- Arama Bölümü -->      <div class="relative mb-4 print:hidden">        <input           id="searchInput"          type="search"          placeholder="Ürün ara..."          class="w-full h-9 pl-9 pr-3 rounded bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-primary"        />        <i class="ri-search-line absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>      </div>            <!-- Tablo -->      <div class="overflow-x-auto">        <table class="min-w-full">          <thead>            <tr class="border-b-2 border-gray-200">              <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">#</th>              <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ürün</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Miktar</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Birim Fiyat</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Toplam</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">İskonto</th>              <th class="py-3 px-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Net Tutar</th>            </tr>          </thead>          <tbody>            <?php             $genel_toplam = 0;            $genel_iskonto = 0;            $sira = 1;            foreach ($detaylar as $d):                 $genel_toplam += $d['toplam_fiyat'];                $genel_iskonto += $d['indirim_tutari'];            ?>              <tr class="border-b border-gray-100 hover:bg-gray-50">                <td class="py-3 px-4 text-sm"><?= $sira++ ?></td>                <td class="py-3 px-4 text-sm">                  <?= htmlspecialchars($d['name']) ?>                  <?php if (!empty($d['urun_notu'])): ?>                    <div class="text-xs text-blue-600 mt-1"><?= htmlspecialchars($d['urun_notu']) ?></div>                  <?php endif; ?>                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['miktar'], 3, ',', '.') ?> <?= $d['olcum_birimi'] ?>                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['birim_fiyat'], 2, ',', '.') ?> ₺                </td>                <td class="py-3 px-4 text-sm text-right">                  <?= number_format($d['toplam_fiyat'], 2, ',', '.') ?> ₺                </td>                <td class="py-3 px-4 text-sm text-right">                  <?php if ($d['indirim_tutari'] > 0): ?>                    <span class="text-red-600">                      -%<?= number_format($d['indirim_orani'], 2, ',', '.') ?>                      (<?= number_format($d['indirim_tutari'], 2, ',', '.') ?> ₺)                    </span>                  <?php else: ?>                    -                  <?php endif; ?>                </td>                <td class="py-3 px-4 text-sm text-right font-medium">                  <?= number_format($d['net_tutar'], 2, ',', '.') ?> ₺                </td>              </tr>            <?php endforeach; ?>          </tbody>        </table>      </div>    </div>        <!-- Toplam Kısmı -->    <div class="totals-section">      <div class="totals-container">        <div class="total-row">          <span class="total-label">Ara Toplam:</span>          <span class="total-value"><?= number_format($genel_toplam, 2, ',', '.') ?> ₺</span>        </div>        <?php if ($genel_iskonto > 0): ?>          <div class="total-row">            <span class="total-label">İskonto:</span>            <span class="total-value text-red-600">-<?= number_format($genel_iskonto, 2, ',', '.') ?> ₺</span>          </div>        <?php endif; ?>        <div class="total-row grand-total">          <span class="total-label">Genel Toplam:</span>          <span class="total-value"><?= number_format($fatura['genel_toplam'], 2, ',', '.') ?> ₺</span>        </div>      </div>    </div>    </div>        <!-- Alt Bilgi -->    <div class="p-6 text-center text-gray-500 border-t">        <!-- Yazdırma için stil --><style type="text/css" media="print">  @page {    size: auto;    margin: 0mm;  }  body {    background-color: #ffffff !important;    padding: 20px !important;  }  .print\:hidden, .no-print, button, .button, input, select, .actions, .action-buttons {
         display: none !important;
@@ -1099,7 +1094,7 @@ else if ($print_mode) {
 
 <div 
   id="notification"
-  class="fixed top-4 right-4 bg-white shadow-lg rounded-lg p-3 transform translate-x-full transition-transform duration-300 z-50 text-sm"
+  class="fixed bottom-4 right-4 pointer-events-none bg-white shadow-lg rounded-lg p-3 transform translate-x-full transition-transform duration-300 z-50 text-sm"
 >
   <div class="flex items-center">
     <i class="ri-checkbox-circle-line text-green-500 text-base mr-2"></i>
@@ -1107,10 +1102,11 @@ else if ($print_mode) {
   </div>
 </div>
 
+<script src="assets/js/fatura_disa_aktar.js"></script>
 <script>
   const items = <?= $itemsJson ?>;
   // Fatura tablosundaki ürün notunu (common note) kullanıyoruz
-  const productNote = <?= json_encode($fatura['aciklama']) ?>;
+  const productNote = <?= json_encode($fatura['aciklama'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
   // Sayfa yüklendiğinde çalışacak kodlar
   document.addEventListener('DOMContentLoaded', function() {
@@ -1275,7 +1271,44 @@ else if ($print_mode) {
     if (totalEl) totalEl.textContent = formatCurrency(subtotal);
   }
 
-  function showNotification(msg) {    const n = document.getElementById('notification');    if (!n) return;        document.getElementById('notificationText').textContent = msg;    n.classList.remove('translate-x-full');    setTimeout(() => n.classList.add('translate-x-full'), 3000);  }  function exportAs(fmt) {    const fmts = { pdf: 'PDF', xlsx: 'Excel', png: 'Görüntü' };    showNotification(`Fatura ${fmts[fmt]} olarak dışa aktarıldı (demo).`);  }
+  function showNotification(msg) {    const n = document.getElementById('notification');    if (!n) return;        document.getElementById('notificationText').textContent = msg;    n.classList.remove('translate-x-full');    setTimeout(() => n.classList.add('translate-x-full'), 3000);  }  // Dışa aktarma (PDF / Excel / PNG) - assets/js/fatura_disa_aktar.js
+  const FATURA_VERISI = <?= json_encode([
+      'baslik' => $faturaTuruBaslik,
+      'faturaNo' => $faturaNo,
+      'tarih' => date('Y-m-d', strtotime($fatura['fatura_tarihi'])),
+      'tarihGoster' => date('d.m.Y', strtotime($fatura['fatura_tarihi'])),
+      'firmaEtiketi' => $firmaEtiketi,
+      'firma' => trim(($fatura['firma_ad'] ?? '') . ' ' . ($fatura['firma_soyad'] ?? '')),
+      'adres' => $fatura['adres'] ?? '',
+      'telefon' => $fatura['telefon'] ?? '',
+      'not' => $orderNote,
+      'genelToplam' => (float)($fatura['genel_toplam'] ?? 0),
+      'kalemler' => array_map(fn($d) => [
+          'kod' => $d['urun_kodu'] ?? '',
+          'ad' => $d['name'] ?? '',
+          'miktar' => (float)$d['miktar'],
+          'birim' => $d['olcum_birimi'] ?? '',
+          'birimFiyat' => (float)$d['birim_fiyat'],
+          'toplam' => (float)$d['toplam_fiyat'],
+          'iskontoOrani' => (float)($d['indirim_orani'] ?? 0),
+          'iskontoTutari' => (float)($d['indirim_tutari'] ?? 0),
+          'kdvOrani' => (float)($d['kdv_orani'] ?? 0),
+          'net' => (float)($d['net_tutar'] ?? 0),
+          'not' => $d['urun_notu'] ?? '',
+      ], $detaylar),
+  ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+
+  let disaAktarmaSuruyor = false;
+  function exportAs(fmt) {
+    const menu = document.getElementById('exportMenu');
+    if (menu) menu.classList.add('hidden');
+    if (disaAktarmaSuruyor) return;
+    const eleman = document.getElementById('invoiceContainer');
+    disaAktarmaSuruyor = true;
+    FaturaDisaAktar.disaAktar(fmt, FATURA_VERISI, eleman, showNotification)
+      .catch(() => {})
+      .finally(() => { disaAktarmaSuruyor = false; });
+  }
 
   // Yazdırma butonu için olay dinleyici
   document.getElementById('printButton').addEventListener('click', function() {

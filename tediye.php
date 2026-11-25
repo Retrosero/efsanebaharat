@@ -474,7 +474,7 @@ if($selectedMusteriID){
 
 <script>
 // Müşteri verilerini JSON formatında al
-const musteriData = <?php echo json_encode($musteriList); ?>;
+const musteriData = <?php echo json_encode($musteriList, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
 document.addEventListener('DOMContentLoaded', function(){
   // Tab menüsü

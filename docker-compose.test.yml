@@ -1,0 +1,89 @@
+# Test ortamı: docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+services:
+  db:
+    image: mariadb:10.11
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_turkish_ci
+    environment:
+      MYSQL_DATABASE: efsanebaharat
+      MYSQL_USER: efsanebaharat
+      MYSQL_PASSWORD: test_pass
+      MYSQL_ROOT_PASSWORD: test_root
+    volumes:
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: db
+      DB_NAME: efsanebaharat
+      DB_USER: efsanebaharat
+      DB_PASS: test_pass
+      R2_ENDPOINT: http://minio:9000
+      R2_REGION: us-east-1
+      R2_ACCESS_KEY_ID: minioadmin
+      R2_SECRET_ACCESS_KEY: minioadmin
+      R2_BUCKET: efsane-resimler
+      R2_PUBLIC_URL: http://minio:9000/efsane-resimler
+      R2_BACKUP_BUCKET: efsane-yedekler
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # Cloudflare R2 yerine yerel S3 uyumlu depolama (kovalar açılışta oluşturulur)
+  minio:
+    image: minio/minio:latest
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        minio server /data & 
+        until mc alias set yerel http://127.0.0.1:9000 minioadmin minioadmin >/dev/null 2>&1; do sleep 1; done;
+        mc mb -p yerel/efsane-resimler yerel/efsane-yedekler &&
+        mc anonymous set download yerel/efsane-resimler &&
+        touch /tmp/hazir; wait
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/hazir"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  tests:
+    image: efsanebaharat-test-runner
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    working_dir: /app
+    environment:
+      APP_URL: http://app
+      DB_HOST: db
+      DB_NAME: efsanebaharat
+      DB_USER: efsanebaharat
+      DB_PASS: test_pass
+      R2_ENDPOINT: http://minio:9000
+      R2_REGION: us-east-1
+      R2_ACCESS_KEY_ID: minioadmin
+      R2_SECRET_ACCESS_KEY: minioadmin
+      R2_BUCKET: efsane-resimler
+      R2_PUBLIC_URL: http://minio:9000/efsane-resimler
+      R2_BACKUP_BUCKET: efsane-yedekler
+    volumes:
+      - ./:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    command: ["sh", "-c", "composer install --no-interaction --no-progress -q && ! (find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l | grep -v '^No syntax errors') && vendor/bin/phpunit"]

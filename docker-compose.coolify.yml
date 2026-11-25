@@ -9,6 +9,14 @@ services:
       DB_NAME: ${DB_NAME:-efsanebaharat}
       DB_USER: ${DB_USER:-efsanebaharat}
       DB_PASS: ${DB_PASS:-change_me}
+      # Cloudflare R2 (resimler + veritabanı yedekleri). Boş bırakılırsa resimler yerelde tutulur.
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      R2_BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-}
+      R2_YEDEK_SAKLAMA_GUN: ${R2_YEDEK_SAKLAMA_GUN:-30}
     depends_on:
       - db
     volumes:

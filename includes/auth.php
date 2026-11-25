@@ -1,5 +1,6 @@
 <?php
 // includes/auth.php
+require_once __DIR__ . '/guvenlik.php';
 
 function isHttpsRequest() {
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
@@ -56,6 +57,10 @@ define('REMEMBER_COOKIE_DURATION', 60 * 60 * 24 * 365); // 1 yıl
  * @return bool|array Başarılı ise kullanıcı bilgileri, başarısız ise false
  */
 function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
+    if (girisKilitliMi()) {
+        error_log('Çok fazla hatalı giriş denemesi: ' . ($_SERVER['REMOTE_ADDR'] ?? '-'));
+        return false;
+    }
     try {
         // Kullanıcıyı veritabanında ara
         $stmt = $pdo->prepare("SELECT * FROM kullanicilar WHERE eposta = :eposta AND aktif = 1");
@@ -64,11 +69,17 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
         
         // Kullanıcı bulunamadıysa veya şifre yanlışsa
         if (!$kullanici || !password_verify($sifre, $kullanici['sifre'])) {
+            girisBasarisizKaydet();
             return false;
         }
+        girisDenemeleriniSifirla();
         
-        // Önceki oturum verilerini temizle
+        // Önceki oturum verilerini temizle ve oturum kimliğini yenile (session fixation koruması)
         $_SESSION = array();
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            session_regenerate_id(true);
+        }
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         
         // Oturumu başlat
         $_SESSION['kullanici_id'] = $kullanici['id'];
@@ -125,10 +136,14 @@ function kullaniciGiris($pdo, $eposta, $sifre, $beni_hatirla = true) {
  * Çerezden kullanıcıyı hatırla
  */
 function hatirlamaTokeniKontrol($pdo) {
-    if (isset($_COOKIE[REMEMBER_COOKIE_NAME])) {
-        list($kullanici_id, $token) = explode(':', $_COOKIE[REMEMBER_COOKIE_NAME], 2);
-        
-        if (!$kullanici_id || !$token) {
+    if (isset($_COOKIE[REMEMBER_COOKIE_NAME]) && is_string($_COOKIE[REMEMBER_COOKIE_NAME])) {
+        $parcalar = explode(':', $_COOKIE[REMEMBER_COOKIE_NAME], 2);
+        if (count($parcalar) !== 2) {
+            return false;
+        }
+        [$kullanici_id, $token] = $parcalar;
+
+        if (!ctype_digit($kullanici_id) || $token === '' || strlen($token) > 128) {
             return false;
         }
         
@@ -140,7 +155,10 @@ function hatirlamaTokeniKontrol($pdo) {
         $kullanici = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($kullanici && $kullanici['remember_token'] && password_verify($token, $kullanici['remember_token'])) {
-            // Kullanıcı doğrulandı, oturum bilgilerini oluştur
+            // Kullanıcı doğrulandı, oturum kimliğini yenile ve oturum bilgilerini oluştur
+            if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+                session_regenerate_id(true);
+            }
             $_SESSION['kullanici_id'] = $kullanici['id'];
             $_SESSION['kullanici_adi'] = $kullanici['kullanici_adi'];
             $_SESSION['eposta'] = $kullanici['eposta'];
@@ -185,6 +203,16 @@ function hatirlamaTokeniKontrol($pdo) {
  * Kullanıcının oturumunu kapatır
  */
 function kullaniciCikis() {
+    global $pdo;
+    // Veritabanındaki beni-hatırla token'ını geçersiz kıl
+    if (isset($pdo, $_SESSION['kullanici_id'])) {
+        try {
+            $stmt = $pdo->prepare("UPDATE kullanicilar SET remember_token = NULL, token_expires_at = NULL WHERE id = :id");
+            $stmt->execute([':id' => $_SESSION['kullanici_id']]);
+        } catch (Exception $e) {
+            error_log('Çıkış token temizleme hatası: ' . $e->getMessage());
+        }
+    }
     // Oturum değişkenlerini temizle
     unset($_SESSION['kullanici_id']);
     unset($_SESSION['kullanici_adi']);
@@ -324,9 +352,8 @@ function checkAuth() {
         // Hatırlama tokenini kontrol et
         global $pdo;
         if (!hatirlamaTokeniKontrol($pdo)) {
-            // Token yoksa veya geçersizse giriş sayfasına yönlendir
-            header('Location: giris.php');
-            exit;
+            // Token yoksa veya geçersizse giriş sayfasına yönlendir (AJAX ise 401 JSON)
+            yetkisizIstek(401);
         }
     } else {
         // Kullanıcı giriş yapmışsa, kullanıcı bilgilerini güncelleyelim
@@ -339,6 +366,10 @@ function checkAuth() {
             
             if ($kullanici_adi) {
                 $_SESSION['kullanici_adi'] = $kullanici_adi;
+            } else {
+                // Kullanıcı silinmiş veya pasif yapılmış: oturumu sonlandır
+                kullaniciCikis();
+                yetkisizIstek(401);
             }
         } catch (Exception $e) {
             // Hata durumunda hiçbir şey yapma
@@ -349,8 +380,13 @@ function checkAuth() {
     }
 }
 
-// Giriş sayfası hariç tüm sayfalarda oturum kontrolü yap
-$current_page = basename($_SERVER['PHP_SELF']);
-if ($current_page != 'giris.php' && $current_page != 'login.php') {
+// CSRF token (formlar için)
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Giriş sayfası hariç tüm sayfalarda oturum kontrolü yap (komut satırı hariç)
+$current_page = basename($_SERVER['SCRIPT_NAME'] ?? '');
+if (PHP_SAPI !== 'cli' && !in_array($current_page, ['giris.php', 'login.php'], true)) {
     checkAuth();
 }
