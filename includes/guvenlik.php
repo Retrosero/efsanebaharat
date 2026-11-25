@@ -1,5 +1,6 @@
 <?php
 // includes/guvenlik.php
+require_once __DIR__ . '/r2.php';
 // Ortak güvenlik yardımcıları: güvenlik başlıkları, CSRF (Origin/Referer) kontrolü,
 // JSON/AJAX istek tespiti, yönetici kontrolü ve güvenli resim yükleme.
 
@@ -245,12 +246,33 @@ if (!function_exists('ajaxIstegiMi')) {
         if ($uzanti === false) {
             return false;
         }
+        if (!is_uploaded_file($dosya['tmp_name'])) {
+            return false;
+        }
+
+        // Cloudflare R2 yapılandırılmışsa resmi oraya yükle ve herkese açık adresini döndür
+        if (r2ResimEtkin()) {
+            // uploads/products/ -> products/..., uploads/images/ -> images/...
+            $klasor = basename(rtrim($hedefKlasor, '/')) === 'images' ? 'images' : 'products';
+            $anahtar = $klasor . '/' . bin2hex(random_bytes(16)) . '.' . $uzanti;
+            try {
+                R2Istemci::ortamdan()->yukle(
+                    getenv('R2_BUCKET'), $anahtar, $dosya['tmp_name'], IZINLI_RESIM_UZANTILARI[$uzanti],
+                    true, ['cache-control' => 'public, max-age=31536000, immutable']
+                );
+            } catch (R2Hatasi $e) {
+                error_log('R2 resim yükleme hatası: ' . $e->getMessage());
+                return false;
+            }
+            return r2GenelAdres($anahtar);
+        }
+
         $hedefKlasor = rtrim($hedefKlasor, '/') . '/';
         if (!is_dir($hedefKlasor) && !@mkdir($hedefKlasor, 0755, true)) {
             return false;
         }
         $yol = $hedefKlasor . bin2hex(random_bytes(16)) . '.' . $uzanti;
-        if (!is_uploaded_file($dosya['tmp_name']) || !move_uploaded_file($dosya['tmp_name'], $yol)) {
+        if (!move_uploaded_file($dosya['tmp_name'], $yol)) {
             return false;
         }
         return $yol;
@@ -261,6 +283,20 @@ if (!function_exists('ajaxIstegiMi')) {
     {
         if (!is_string($yol) || $yol === '') {
             return false;
+        }
+        // R2'deki resim: yalnızca kendi kovamızın products/ ve images/ klasörlerindekiler silinir
+        if (strpos($yol, 'http') === 0) {
+            $anahtar = r2AnahtarCoz($yol);
+            if ($anahtar === null || !($istemci = R2Istemci::ortamdan()) || !getenv('R2_BUCKET')) {
+                return false;
+            }
+            try {
+                $istemci->sil(getenv('R2_BUCKET'), $anahtar);
+                return true;
+            } catch (R2Hatasi $e) {
+                error_log('R2 resim silme hatası: ' . $e->getMessage());
+                return false;
+            }
         }
         $kok = realpath(__DIR__ . '/../uploads');
         $gercek = realpath(__DIR__ . '/../' . ltrim($yol, '/'));

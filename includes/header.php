@@ -431,6 +431,7 @@ if (!in_array($current_page, $exempt_pages)) {
                 ['url' => 'kullanicilar.php', 'ad' => 'Kullanıcılar', 'ikon' => 'ri-user-settings-line', 'yetki' => 'kullanicilar.php'],
                 ['url' => 'roller.php', 'ad' => 'Roller', 'ikon' => 'ri-shield-user-line', 'yetki' => 'roller.php'],
                 ['url' => 'ayarlar.php', 'ad' => 'Ayarlar', 'ikon' => 'ri-settings-line', 'yetki' => 'ayarlar.php'],
+                ['url' => 'yedekler.php', 'ad' => 'Yedekler', 'ikon' => 'ri-database-2-line', 'yetki' => 'yedekler.php'],
             ],
         ];
 

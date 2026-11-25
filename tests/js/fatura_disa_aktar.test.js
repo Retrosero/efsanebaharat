@@ -33,11 +33,20 @@ test('excelSatirlari: kalemsiz/eksik veride hata vermez', () => {
   assert.deepEqual(satirlar.at(-1), ['', '', '', '', '', 'Genel Toplam', 0]);
 });
 
-test('dosyaAdi: güvenli dosya adı', () => {
-  assert.equal(F.dosyaAdi(veri, 'pdf'), 'Fatura_INV-00000012_2026-11-25.pdf');
-  assert.equal(F.dosyaAdi({ faturaNo: '../x y', tarih: '' }, 'png'), 'Fatura_.._x_y_.png');
+test('dosyaAdi: cari adı ve tarih dosya adında', () => {
+  assert.equal(F.dosyaAdi(veri, 'pdf'), 'Ali_Veli_25.11.2026_INV-00000012.pdf');
+  assert.equal(F.dosyaAdi({ ...veri, firma: 'BERK BATUHAN KİBAR' }, 'xlsx'), 'BERK_BATUHAN_KİBAR_25.11.2026_INV-00000012.xlsx');
+});
+
+test('dosyaAdi: geçersiz karakterler ve yol ayraçları temizlenir', () => {
+  assert.equal(F.dosyaAdi({ firma: '../Kötü/Ad: "x"?', tarihGoster: '01.02.2026', faturaNo: 'INV-1' }, 'png'), 'Kötü_Ad_x_01.02.2026_INV-1.png');
+  assert.equal(F.dosyaAdi({ firma: '', tarih: '2026-01-02' }, 'pdf'), 'Fatura_2026-01-02.pdf');
 });
 
 test('disaAktar: bilinmeyen formatı reddeder', async () => {
   await assert.rejects(F.disaAktar('docx', veri, null), /Bilinmeyen format/);
+});
+
+test('dosyaAdi: ters eğik çizgi ve kontrol karakterleri temizlenir', () => {
+  assert.equal(F.dosyaAdi({ firma: 'A\\B\u0001C', tarihGoster: '01.02.2026' }, 'pdf'), 'A_B_C_01.02.2026.pdf');
 });

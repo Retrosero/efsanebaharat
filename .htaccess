@@ -13,7 +13,7 @@ Options -Indexes
 # Sunucu tarafı yardımcı dizinlere doğrudan erişimi engelle
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^(\.git|\.codex-remote-attachments|\.claude|\.kiro|db-init|sql|scratch|tests|logs|temp|yedek|node_modules|vendor)(/|$) - [F,L]
+    RewriteRule ^(cron|\.git|\.codex-remote-attachments|\.claude|\.kiro|db-init|sql|scratch|tests|logs|temp|yedek|node_modules|vendor)(/|$) - [F,L]
     RewriteRule ^includes/ - [F,L]
 </IfModule>
 

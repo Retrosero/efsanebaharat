@@ -29,9 +29,24 @@
   }
 
   // Dosya adında sorun çıkaracak karakterleri temizler
+  // Dosya adı: <Cari Adı>_<gg.aa.yyyy>_<Fatura No>.<uzantı>
+  // Türkçe harfler korunur; Windows/macOS'ta geçersiz karakterler ve yol ayraçları temizlenir.
+  function dosyaAdiParcasi(metin) {
+    return String(metin || '')
+      .replace(/[<>:"\/\\|?*\u0000-\u001f]+/g, ' ')
+      .replace(/\.{2,}/g, '.')
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/^[._]+|[._]+$/g, '');
+  }
+
   function dosyaAdi(veri, uzanti) {
-    var ad = ('Fatura_' + (veri.faturaNo || '') + '_' + (veri.tarih || '')).replace(/[^\w.\-]+/g, '_');
-    return ad + '.' + uzanti;
+    var parcalar = [
+      dosyaAdiParcasi(veri.firma) || 'Fatura',
+      dosyaAdiParcasi(veri.tarihGoster || veri.tarih),
+      dosyaAdiParcasi(veri.faturaNo)
+    ].filter(Boolean);
+    return parcalar.join('_').slice(0, 150) + '.' + uzanti;
   }
 
   function sayi(v) {

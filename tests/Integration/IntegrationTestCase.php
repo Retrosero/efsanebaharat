@@ -100,7 +100,9 @@ abstract class IntegrationTestCase extends TestCase
             CURLOPT_HTTPHEADER => array_merge($varsayilan, $basliklar),
         ]);
         if ($govde !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($govde) ? http_build_query($govde) : $govde);
+            $dosyaVar = is_array($govde) && array_filter($govde, fn($v) => $v instanceof \CURLFile);
+            // Dosya içeren formlar multipart, diğerleri urlencoded gönderilir
+            curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($govde) && !$dosyaVar ? http_build_query($govde) : $govde);
         }
         $yanit = curl_exec($ch);
         $this->assertNotFalse($yanit, "İstek başarısız: $url " . curl_error($ch));
@@ -131,6 +133,7 @@ abstract class IntegrationTestCase extends TestCase
 
     protected function girisYap(string $eposta = self::ADMIN_EPOSTA, string $parola = self::PAROLA): void
     {
+        file_put_contents($this->cerezDosyasi, ''); // önceki oturumu temizle
         $this->get('giris.php');
         $r = $this->istek('POST', 'giris.php', ['eposta' => $eposta, 'sifre' => $parola, 'beni_hatirla' => '1']);
         $this->assertSame(302, $r['status'], 'Giriş başarısız: ' . substr(strip_tags($r['body']), 0, 300));
