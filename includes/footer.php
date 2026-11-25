@@ -87,11 +87,11 @@ window.addEventListener('resize', function() {
 // Yeni İşlem Menü
 function toggleNewActionMenu(e){
   e.stopPropagation();
-  document.getElementById('newActionMenu').classList.toggle('hidden');
+  document.getElementById('newActionMenu')?.classList.toggle('hidden');
 }
 document.addEventListener('click', function(e) {
   const menu = document.getElementById('newActionMenu');
-  if(!menu.contains(e.target)){
+  if(menu && !menu.contains(e.target)){
     menu.classList.add('hidden');
   }
 });
@@ -99,11 +99,11 @@ document.addEventListener('click', function(e) {
 // Bildirim Menü
 function toggleNotificationMenu(e){
   e.stopPropagation();
-  document.getElementById('notificationMenu').classList.toggle('hidden');
+  document.getElementById('notificationMenu')?.classList.toggle('hidden');
 }
 document.addEventListener('click', function(e) {
   const menu = document.getElementById('notificationMenu');
-  if(!menu.contains(e.target)){
+  if(menu && !menu.contains(e.target)){
     menu.classList.add('hidden');
   }
 });

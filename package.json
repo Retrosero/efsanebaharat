@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/js/birim.test.js",
-    "test:js": "node --test tests/js/birim.test.js"
+    "test": "node --test tests/js/birim.test.js tests/js/fatura_disa_aktar.test.js",
+    "test:js": "node --test tests/js/birim.test.js tests/js/fatura_disa_aktar.test.js"
   },
   "keywords": [],
   "author": "",

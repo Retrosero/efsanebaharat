@@ -143,4 +143,25 @@ final class ModulSayfalariTest extends IntegrationTestCase
         $this->assertStringNotContainsString('>Yönetim</div>', $r['body']);
         $this->assertStringNotContainsString('href="kullanicilar.php"', $r['body']);
     }
+
+    public function testFaturaDisaAktarmaDemoDegil(): void
+    {
+        $id = self::$pdo->query("SELECT f.id FROM faturalar f JOIN fatura_detaylari d ON d.fatura_id = f.id ORDER BY f.id DESC LIMIT 1")->fetchColumn();
+        if (!$id) {
+            $this->markTestSkipped('Detaylı fatura yok');
+        }
+        $this->girisYap();
+        $r = $this->get("fatura_detay.php?id=$id");
+        $this->assertSame(200, $r['status']);
+        $this->assertStringNotContainsString('(demo)', $r['body']);
+        $this->assertStringContainsString('assets/js/fatura_disa_aktar.js', $r['body']);
+        $this->assertMatchesRegularExpression('/const FATURA_VERISI = (\{.*?\});\r?\n/s', $r['body']);
+        preg_match('/const FATURA_VERISI = (\{.*?\});\r?\n/s', $r['body'], $m);
+        $veri = json_decode($m[1], true);
+        $this->assertIsArray($veri, 'FATURA_VERISI geçerli JSON olmalı');
+        $this->assertNotEmpty($veri['kalemler']);
+        $this->assertArrayHasKey('genelToplam', $veri);
+        $js = $this->get('assets/js/fatura_disa_aktar.js');
+        $this->assertSame(200, $js['status']);
+    }
 }
